@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html> 
+  <head>
+    <title>Twini Putt</title> 
+  </head>
+  <body>
+	
+    <canvas id="mycanvas"></canvas> 
+  </body>
+ 
+  <script src="https://cdn.jsdelivr.net/processing.js/1.4.8/processing.min.js"></script> 
+
+  <script>
+  var programCode = function(processingInstance) {
+    with (processingInstance) {
+size(600, 600); 
+
+var ballColor = color(255);
+var ballStroke = color(0, 0, 0);
+var ballStrokeWeight = 3;
+var bounciness = -0.8;
+var holePos = [];
+var numHoles = 0;
+
+var levels = [{
+    strt1: {x: 150, y: 500, origin: "left"},
+    strt2: {x: 450, y: 500, origin: "right"},
+    obstacles: [],
+    holes: [{x: 150, y: 150}, {x: 450, y: 150}]
+},{
+    strt1: {x: 150, y: 500, origin: "left"},
+    strt2: {x: 450, y: 500, origin: "right"},
+    obstacles: [{x: 200, y: 100, width: 50, height:50, type: "wall"}, {x: 200, y: 300, width: 10, height: 400, type: "wall"}],
+    holes: [{x: 285, y: 150}, {x: 450, y: 150}]
+}];
+var levelInd = 0;
+
+var drawLine = function(line1){
+    line(line1.x1, line1.y1, line1.x2, line1.y2);
+};
+
+var createLine = function(x1, y1, x2, y2){
+    return {x1: x1, y1: y1, x2: x2, y2: y2};
+};
+
+var printLineStats = function(line){
+    println("x1: " + line.x1);
+    println("y1: " + line.y1);
+    println("x2: " + line.x2);
+    println("y2: " + line.y2);
+};
+
+{
+var calcSlope = function(line){
+    return (line.y2 - line.y1) / (line.x2 - line.x1);
+};
+
+var calcIntercept = function(line, slope){
+    var x = line.x1;
+    var y = line.y1;
+    return y - slope * x;
+};
+
+var isPointOnLine = function(line, point, slope){
+    slope = calcSlope(line);
+    var newSlope = calcSlope({x1: line.x1, y1: line.y1, x2: point.x, y2: point.y});
+    if(abs(newSlope - slope) <= 5 || line.x1 === line.x2){
+        if(point.x >= min(line.x1, line.x2) && point.x <= max(line.x1, line.x2)){
+            return true;
+        }
+    } else{
+        return false;
+    }
+    
+};
+
+var prepLine = function(line){
+    if(line.x1 === line.x2){
+        return {x: line.x1, vertical: true, x1: line.x1,  y1: line.y1,  x2: line.x2,  y2: line.y2};
+    }
+    var m = calcSlope(line);
+    return {m: m, b: calcIntercept(line, m), x1: line.x1,  y1: line.y1,  x2: line.x2,  y2: line.y2};
+};
+
+var findIntersection = function(line1, line2) {
+    line1 = prepLine(line1);
+    line2 = prepLine(line2);
+  if (line1.vertical && line2.vertical) {
+    // Both lines are vertical, no intersection
+    return {inter: false};
+  } else if (line1.vertical) {
+    // Line 1 is vertical, calculate intersection with Line 2
+    var x = line1.x;
+    var y = line2.m * x + line2.b;
+    return {x: x, y: y, inter: isPointOnLine(line1, {x: x, y: y}, line1.m) && isPointOnLine(line2, {x: x, y: y}, line2.m)};
+  } else if (line2.vertical) {
+    // Line 2 is vertical, calculate intersection with Line 1
+    var x = line2.x;
+    var y = line1.m * x + line1.b;
+    return {x: x, y: y, inter: isPointOnLine(line1, {x: x, y: y}, line1.m) && isPointOnLine(line2, {x: x, y: y}, line2.m)};
+  } else {
+    // Both lines are non-vertical, calculate intersection
+    var x = (line2.b - line1.b) / (line1.m - line2.m);
+    var y = line1.m * x + line1.b;
+    return {x: x, y: y, inter: isPointOnLine(line1, {x: x, y: y}, line1.m) && isPointOnLine(line2, {x: x, y: y}, line2.m)};
+  }
+};
+} // line intersection stuff
+
+var Obstacle = function(config){
+    this.position = new PVector(config.x, config.y);
+    this.type = config.type;
+    this.width = config.width;
+    this.height = config.height;
+};
+
+Obstacle.prototype.draw = function() {
+    var pos = this.position;
+    switch(this.type){
+        case "wall":
+            fill(230, 192, 41);
+            stroke(153, 130, 55);
+            strokeWeight(3);
+            rect(pos.x, pos.y, this.width, this.height);
+            break;
+        default:
+            break;
+    }
+};
+
+var ObstacleSystem = function(){
+    this.obstacles = [];
+};
+
+ObstacleSystem.prototype.run = function() {
+    for (var i in this.obstacles){
+        this.obstacles[i].draw();
+    }
+};
+
+var obstacles = new ObstacleSystem();
+
+var GolfBall = function(config){
+    this.position = new PVector(config.x, config.y);
+    this.velocity = new PVector(0, 0, 0);
+    this.acceleration = new PVector(0, 0, 0);
+    this.mass = 3;
+    this.size = config.size;
+    this.originSide = config.originSide;
+    this.relaunch = false;
+    this.show = true;
+};
+
+GolfBall.prototype.draw = function() {
+    stroke(ballStroke);
+    strokeWeight(ballStrokeWeight);
+    fill(ballColor);
+    var pos = this.position;
+    ellipse(pos.x, pos.y, this.size, this.size);
+};
+
+GolfBall.prototype.applyForce = function(force){
+    var f = PVector.div(force, this.mass);
+    this.acceleration.add(f);
+    
+};
+
+GolfBall.prototype.isColliding = function(obstacle){
+    var bPos = this.position;
+    var oPos = obstacle.position;
+    var r = this.size/2;
+    var o = obstacle;
+    return bPos.x + r> oPos.x && bPos.x - r < oPos.x + o.width && bPos.y + r > oPos.y && bPos.y - r < oPos.y + o.height;
+};
+
+GolfBall.prototype.bounce = function(side, movementLine, x, y){
+    var intersect = findIntersection(side, movementLine);
+    if(intersect.inter){ 
+        this.position.x = intersect.x;
+        this.position.y = intersect.y;
+        this.velocity.x *= x;
+        this.velocity.y *= y;
+        return true;
+    } else {
+        return false;
+    }
+};
+
+GolfBall.prototype.update = function() {
+    this.velocity.add(this.acceleration);
+    this.velocity.mult(0.99);
+    if(this.velocity.mag() <= 0.3){
+        this.velocity.set(0, 0, 0);
+        this.relaunch = true;
+    }
+    this.position.add(this.velocity);
+    for(var i = 0; i < 2; i++){
+        if(dist(this.position.x, this.position.y, holePos[i].x, holePos[i].y) <= 10/(this.velocity.mag() + 1)){
+            numHoles ++;
+            this.relaunch = false;
+            this.show = false;
+        }
+    }
+    this.acceleration.mult(0);
+    var r = this.size/2;
+    if(this.position.x - r < 0){
+        this.position.x = r;
+        this.velocity.x *= bounciness;
+    } else if(this.position.x + r > width){
+        this.position.x = width - r;
+        this.velocity.x *= bounciness;
+    }  else if(this.position.y - r < 0){
+        this.position.y = r;
+        this.velocity.y *= bounciness;
+    }  else if(this.position.y + r > height){
+        this.position.y = height - r;
+        this.velocity.y *= bounciness;
+    }
+    
+    switch(this.originSide){
+        case "left":
+            if(this.position.x + r + 2.5 > width/2){
+                this.position.x = width/2 - r - 2.5;
+                this.velocity.x *= bounciness;
+            }
+            break;
+        case "right":
+            if(this.position.x - r - 2.5 < width/2){
+                this.position.x = width/2 + r + 2.5;
+                this.velocity.x *= bounciness;
+            }
+            break;
+    }
+    
+    for(var i in obstacles.obstacles){
+        var col = this.isColliding(obstacles.obstacles[i]);
+        var o = obstacles.obstacles[i];
+        var pos = o.position;
+        if(col && o.type === "wall"){
+            var movementVec = new PVector(this.velocity.x, this.velocity.y);
+            movementVec.normalize();
+            movementVec.mult(width + height);
+            var movementLine = {x1: this.position.x, y1: this.position.y, x2: this.position.x - movementVec.x, y2: this.position.y - movementVec.y};
+            var top = createLine(pos.x - r, pos.y - r, pos.x + o.width + r, pos.y - r);
+            var botom = createLine(pos.x - r, pos.y + o.height + r, pos.x + o.width + r, pos.y + o.height + r);
+            var left = createLine(pos.x - r, pos.y - r, pos.x - r, pos.y + o.height + r);
+            var right = createLine(pos.x + o.width + r, pos.y - r, pos.x + o.width + r, pos.y + o.height + r);
+            
+            if (this.bounce(top, movementLine, 1, bounciness)){
+                // so that only one gets called
+            } else if (this.bounce(botom, movementLine, 1, bounciness)) {
+
+            } else if (this.bounce(left, movementLine, bounciness, 1)){
+
+            } else if (this.bounce(right, movementLine, bounciness, 1)){
+
+            }    
+            
+        }
+    }
+};
+
+var BallSystem = function(){
+    this.balls = [];
+};
+
+BallSystem.prototype.run = function(){
+    for (var i = this.balls.length - 1; i >= 0; i--) {
+        if(this.balls[i].show){
+            this.balls[i].update();
+            this.balls[i].draw();
+            noStroke();
+            fill(0, 100);
+            if(mouseX <= 300){
+                for(var j = 10; j <= 100; j += 10){
+                    ellipse(lerp(this.balls[i].position.x, mouseX - (this.balls[0].position.x - this.balls[i].position.x), j/100), lerp(this.balls[i].position.y, mouseY, j/100), (100 - j)/10, (100 - j)/10);
+                }
+            } else if(mouseX > 300){
+                for(var j = 10; j <= 100; j += 10){
+                    ellipse(lerp(this.balls[i].position.x, mouseX - (this.balls[1].position.x - this.balls[i].position.x), j/100), lerp(this.balls[i].position.y, mouseY, j/100), (100 - j)/10, (100 - j)/10);
+                }
+            }
+        }
+        
+        
+    }
+};
+
+BallSystem.prototype.launch = function(){
+    for (var i = this.balls.length - 1; i >= 0; i--) {
+        if(this.balls[i].relaunch){
+            var dist;
+            if(mouseX <= 300){
+                dist = new PVector(mouseX - (this.balls[0].position.x - this.balls[i].position.x) - this.balls[i].position.x, mouseY - this.balls[i].position.y);
+            } else if (mouseX > 300){
+                dist = new PVector(mouseX - (this.balls[1].position.x - this.balls[i].position.x) - this.balls[i].position.x, mouseY - this.balls[i].position.y);
+            }
+            dist.div(-8);
+            this.balls[i].applyForce(dist);
+            this.balls[i].relaunch = false;
+            
+        }
+    }
+};
+
+var golfBalls = new BallSystem();
+
+
+
+var fillLevel =  function(){
+    golfBalls.balls = [];
+    golfBalls.balls.push(new GolfBall({
+        x: levels[levelInd].strt1.x,
+        y: levels[levelInd].strt1.y,
+        size: 10,
+        originSide: levels[levelInd].strt1.origin,
+    }));
+    golfBalls.balls.push(new GolfBall({
+        x: levels[levelInd].strt2.x,
+        y: levels[levelInd].strt2.y,
+        size: 10,
+        originSide: levels[levelInd].strt2.origin,
+    }));
+    for(var i = 0; i < levels[levelInd].obstacles.length; i++){
+        var curObs = levels[levelInd].obstacles[i];
+        obstacles.obstacles.push(new Obstacle({
+            x: curObs.x,
+            y: curObs.y,
+            width: curObs.width,
+            height: curObs.height,
+            type: curObs.type,
+        }));
+    }
+    holePos = levels[levelInd].holes;
+};
+
+fillLevel();
+
+var play = function(){
+    fill(92, 204, 12, 200);
+    noStroke();
+    rect(0, 0, width, height);
+    stroke(0);
+    strokeWeight(5);
+    line(width/2, -10, width/2, height + 10);
+    fill(0);
+    noStroke();
+    for(var i in holePos){
+        ellipse(holePos[i].x, holePos[i].y, 15, 15);
+    }
+    obstacles.run();
+    golfBalls.run();
+};
+
+var draw = function() {
+    play();
+};
+
+mouseReleased = function(){
+    golfBalls.launch();
+};
+
+
+}};
+
+  // Get the canvas that ProcessingJS will use
+  var canvas = document.getElementById("mycanvas"); 
+  // Pass the function to ProcessingJS constructor
+  var processingInstance = new Processing(canvas, programCode); 
+
+
+  </script>
+</html>
