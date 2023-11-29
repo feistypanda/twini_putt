@@ -29,6 +29,11 @@ var levels = [{
     holes: [{x: 150, y: 150}, {x: 450, y: 150}]
 },{
     strt1: {x: 150, y: 500, origin: "left"},
+    strt2: {x: 450, y: 200, origin: "right"},
+    obstacles: [{x: 426, y: 100, width: 50, height:50, type: "wall"}],
+    holes: [{x: 150, y: 100}, {x: 450, y: 400}]
+},{
+    strt1: {x: 150, y: 500, origin: "left"},
     strt2: {x: 450, y: 500, origin: "right"},
     obstacles: [{x: 200, y: 100, width: 50, height:50, type: "wall"}, {x: 200, y: 300, width: 10, height: 400, type: "wall"}],
     holes: [{x: 285, y: 150}, {x: 450, y: 150}]
@@ -65,7 +70,7 @@ var isPointOnLine = function(line, point, slope){
     slope = calcSlope(line);
     var newSlope = calcSlope({x1: line.x1, y1: line.y1, x2: point.x, y2: point.y});
     if(abs(newSlope - slope) <= 5 || line.x1 === line.x2){
-        if(point.x >= min(line.x1, line.x2) && point.x <= max(line.x1, line.x2)){
+        if(point.x >= min(line.x1, line.x2) && point.x <= max(line.x1, line.x2) && point.y >= min(line.y1, line.y2) && point.y <= max(line.y1, line.y2)){
             return true;
         }
     } else{
@@ -195,7 +200,7 @@ GolfBall.prototype.update = function() {
     }
     this.position.add(this.velocity);
     for(var i = 0; i < 2; i++){
-        if(dist(this.position.x, this.position.y, holePos[i].x, holePos[i].y) <= 10/(this.velocity.mag() + 1)){
+        if(dist(this.position.x, this.position.y, holePos[i].x, holePos[i].y) <= this.size/2 + 15/2 && this.velocity.mag() <= 3){
             numHoles ++;
             this.relaunch = false;
             this.show = false;
@@ -241,13 +246,16 @@ GolfBall.prototype.update = function() {
             movementVec.normalize();
             movementVec.mult(width + height);
             var movementLine = {x1: this.position.x, y1: this.position.y, x2: this.position.x - movementVec.x, y2: this.position.y - movementVec.y};
+            printLineStats(movementLine);
             var top = createLine(pos.x - r, pos.y - r, pos.x + o.width + r, pos.y - r);
+            printLineStats(top);
             var botom = createLine(pos.x - r, pos.y + o.height + r, pos.x + o.width + r, pos.y + o.height + r);
             var left = createLine(pos.x - r, pos.y - r, pos.x - r, pos.y + o.height + r);
             var right = createLine(pos.x + o.width + r, pos.y - r, pos.x + o.width + r, pos.y + o.height + r);
             
             if (this.bounce(top, movementLine, 1, bounciness)){
                 // so that only one gets called
+                println("death");
             } else if (this.bounce(botom, movementLine, 1, bounciness)) {
 
             } else if (this.bounce(left, movementLine, bounciness, 1)){
@@ -273,11 +281,11 @@ BallSystem.prototype.run = function(){
             fill(0, 100);
             if(mouseX <= 300){
                 for(var j = 10; j <= 100; j += 10){
-                    ellipse(lerp(this.balls[i].position.x, mouseX - (this.balls[0].position.x - this.balls[i].position.x), j/100), lerp(this.balls[i].position.y, mouseY, j/100), (100 - j)/10, (100 - j)/10);
+                    ellipse(lerp(this.balls[i].position.x, mouseX - (this.balls[0].position.x - this.balls[i].position.x), j/100), lerp(this.balls[i].position.y, mouseY  - (this.balls[0].position.y - this.balls[i].position.y), j/100), (100 - j)/10, (100 - j)/10);
                 }
             } else if(mouseX > 300){
                 for(var j = 10; j <= 100; j += 10){
-                    ellipse(lerp(this.balls[i].position.x, mouseX - (this.balls[1].position.x - this.balls[i].position.x), j/100), lerp(this.balls[i].position.y, mouseY, j/100), (100 - j)/10, (100 - j)/10);
+                    ellipse(lerp(this.balls[i].position.x, mouseX - (this.balls[1].position.x - this.balls[i].position.x), j/100), lerp(this.balls[i].position.y, mouseY  - (this.balls[1].position.y - this.balls[i].position.y), j/100), (100 - j)/10, (100 - j)/10);
                 }
             }
         }
@@ -291,9 +299,9 @@ BallSystem.prototype.launch = function(){
         if(this.balls[i].relaunch){
             var dist;
             if(mouseX <= 300){
-                dist = new PVector(mouseX - (this.balls[0].position.x - this.balls[i].position.x) - this.balls[i].position.x, mouseY - this.balls[i].position.y);
+                dist = new PVector(mouseX - (this.balls[0].position.x - this.balls[i].position.x) - this.balls[i].position.x, mouseY  - (this.balls[0].position.y - this.balls[i].position.y) - this.balls[i].position.y);
             } else if (mouseX > 300){
-                dist = new PVector(mouseX - (this.balls[1].position.x - this.balls[i].position.x) - this.balls[i].position.x, mouseY - this.balls[i].position.y);
+                dist = new PVector(mouseX - (this.balls[1].position.x - this.balls[i].position.x) - this.balls[i].position.x, mouseY  - (this.balls[1].position.y - this.balls[i].position.y) - this.balls[i].position.y);
             }
             dist.div(-8);
             this.balls[i].applyForce(dist);
@@ -309,6 +317,7 @@ var golfBalls = new BallSystem();
 
 var fillLevel =  function(){
     golfBalls.balls = [];
+    obstacles.obstacles = [];
     golfBalls.balls.push(new GolfBall({
         x: levels[levelInd].strt1.x,
         y: levels[levelInd].strt1.y,
@@ -332,6 +341,7 @@ var fillLevel =  function(){
         }));
     }
     holePos = levels[levelInd].holes;
+    numHoles = 0;
 };
 
 fillLevel();
@@ -350,7 +360,13 @@ var play = function(){
     }
     obstacles.run();
     golfBalls.run();
+    if(numHoles >= 2){
+        levelInd ++;
+        fillLevel();
+    }
 };
+
+
 
 var draw = function() {
     play();
