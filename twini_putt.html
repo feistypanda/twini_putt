@@ -34,9 +34,19 @@ var levels = [{
     holes: [{x: 150, y: 100}, {x: 450, y: 400}]
 },{
     strt1: {x: 150, y: 500, origin: "left"},
+    strt2: {x: 450, y: 200, origin: "right"},
+    obstacles: [{x: 426, y: 100, width: 50, height:50, type: "hill", direc: new PVector(0, 1)}],
+    holes: [{x: 150, y: 100}, {x: 450, y: 400}]
+},{
+    strt1: {x: 150, y: 500, origin: "left"},
     strt2: {x: 450, y: 500, origin: "right"},
     obstacles: [{x: 200, y: 100, width: 50, height:50, type: "wall"}, {x: 200, y: 300, width: 10, height: 400, type: "wall"}],
     holes: [{x: 285, y: 150}, {x: 450, y: 150}]
+},{
+    strt1: {x: 150, y: 500, origin: "left"},
+    strt2: {x: 450, y: 500, origin: "right"},
+    obstacles: [{x: 200, y: 100, width: 50, height:50, type: "wall"}, {x: 200, y: 300, width: 10, height: 400, type: "wall"}],
+    holes: [{x: -285, y: 150}, {x: -450, y: 150}]
 }];
 var levelInd = 0;
 
@@ -55,28 +65,39 @@ var printLineStats = function(line){
     println("y2: " + line.y2);
 };
 
+var findSign = function(n){
+    // finds sign of n. returns -1, 1, or 0
+    if (n === 0){
+        return 0;
+    }
+
+    return abs(n)/n
+}
+
 {
 var calcSlope = function(line){
     return (line.y2 - line.y1) / (line.x2 - line.x1);
+    // returns the slope of the line
 };
 
 var calcIntercept = function(line, slope){
     var x = line.x1;
     var y = line.y1;
     return y - slope * x;
+    // returns intercept (b in mx + b = y)
 };
 
 var isPointOnLine = function(line, point, slope){
     slope = calcSlope(line);
     var newSlope = calcSlope({x1: line.x1, y1: line.y1, x2: point.x, y2: point.y});
-    if(abs(newSlope - slope) <= 5 || line.x1 === line.x2){
+    if(abs(newSlope - slope) <= 1 || line.x1 === line.x2){
         if(point.x >= min(line.x1, line.x2) && point.x <= max(line.x1, line.x2) && point.y >= min(line.y1, line.y2) && point.y <= max(line.y1, line.y2)){
             return true;
         }
     } else{
         return false;
     }
-    
+    // finds if a point is on a line (or close enough);
 };
 
 var prepLine = function(line){
@@ -117,6 +138,7 @@ var Obstacle = function(config){
     this.type = config.type;
     this.width = config.width;
     this.height = config.height;
+    this.direc = config.direc;
 };
 
 Obstacle.prototype.draw = function() {
@@ -127,6 +149,27 @@ Obstacle.prototype.draw = function() {
             stroke(153, 130, 55);
             strokeWeight(3);
             rect(pos.x, pos.y, this.width, this.height);
+            break;
+        case "hill":
+            fill(51, 33, 5);
+            stroke(153, 130, 55);
+            strokeWeight(3);
+            rect(pos.x, pos.y, this.width, this.height);
+            if(this.direc.x === 0 && this.direc.y !== 0){
+                var s = findSign(this.direc.y);
+                beginShape();
+                    vertex(this.position.x + this.width/8, (this.position.y + this.height/2) - (this.height/2 * s) + this.height/8 * s);
+                    vertex(this.position.x + this.width/2, (this.position.y + this.height/2) + (this.height/2 * s) - this.height/8 * s);
+                    vertex(this.position.x + this.width - this.width/8, (this.position.y + this.height/2) - (this.height/2 * s) + this.height/8 * s);
+                endShape();
+            } else if(this.direc.y === 0 && this.direc.x !== 0){
+                var s = findSign(this.direc.x);
+                beginShape();
+                    vertex((this.position.x + this.width/2) - (this.width/2 * s) + this.width/8 * s, this.position.y + this.height/8);
+                    vertex((this.position.x + this.width/2) + (this.width/2 * s) - this.width/8 * s, this.position.y + this.height/2);
+                    vertex((this.position.x + this.width/2) - (this.width/2 * s) + this.width/8 * s, this.position.y + this.height - this.height/8);
+                endShape();
+            }
             break;
         default:
             break;
@@ -154,6 +197,7 @@ var GolfBall = function(config){
     this.originSide = config.originSide;
     this.relaunch = false;
     this.show = true;
+    this.canStop = true;
 };
 
 GolfBall.prototype.draw = function() {
@@ -165,9 +209,9 @@ GolfBall.prototype.draw = function() {
 };
 
 GolfBall.prototype.applyForce = function(force){
+
     var f = PVector.div(force, this.mass);
     this.acceleration.add(f);
-    
 };
 
 GolfBall.prototype.isColliding = function(obstacle){
@@ -175,7 +219,7 @@ GolfBall.prototype.isColliding = function(obstacle){
     var oPos = obstacle.position;
     var r = this.size/2;
     var o = obstacle;
-    return bPos.x + r> oPos.x && bPos.x - r < oPos.x + o.width && bPos.y + r > oPos.y && bPos.y - r < oPos.y + o.height;
+    return bPos.x + r > oPos.x && bPos.x - r < oPos.x + o.width && bPos.y + r > oPos.y && bPos.y - r < oPos.y + o.height;
 };
 
 GolfBall.prototype.bounce = function(side, movementLine, x, y){
@@ -194,11 +238,12 @@ GolfBall.prototype.bounce = function(side, movementLine, x, y){
 GolfBall.prototype.update = function() {
     this.velocity.add(this.acceleration);
     this.velocity.mult(0.99);
-    if(this.velocity.mag() <= 0.3){
+    this.position.add(this.velocity);
+    if(this.velocity.mag() <= 0.3 && this.canStop){
         this.velocity.set(0, 0, 0);
         this.relaunch = true;
     }
-    this.position.add(this.velocity);
+    
     for(var i = 0; i < 2; i++){
         if(dist(this.position.x, this.position.y, holePos[i].x, holePos[i].y) <= this.size/2 + 15/2 && this.velocity.mag() <= 3){
             numHoles ++;
@@ -236,34 +281,38 @@ GolfBall.prototype.update = function() {
             }
             break;
     }
-    
+    this.canStop = true;
     for(var i in obstacles.obstacles){
         var col = this.isColliding(obstacles.obstacles[i]);
         var o = obstacles.obstacles[i];
         var pos = o.position;
-        if(col && o.type === "wall"){
-            var movementVec = new PVector(this.velocity.x, this.velocity.y);
-            movementVec.normalize();
-            movementVec.mult(width + height);
-            var movementLine = {x1: this.position.x, y1: this.position.y, x2: this.position.x - movementVec.x, y2: this.position.y - movementVec.y};
-            printLineStats(movementLine);
-            var top = createLine(pos.x - r, pos.y - r, pos.x + o.width + r, pos.y - r);
-            printLineStats(top);
-            var botom = createLine(pos.x - r, pos.y + o.height + r, pos.x + o.width + r, pos.y + o.height + r);
-            var left = createLine(pos.x - r, pos.y - r, pos.x - r, pos.y + o.height + r);
-            var right = createLine(pos.x + o.width + r, pos.y - r, pos.x + o.width + r, pos.y + o.height + r);
-            
-            if (this.bounce(top, movementLine, 1, bounciness)){
-                // so that only one gets called
-                println("death");
-            } else if (this.bounce(botom, movementLine, 1, bounciness)) {
+        if (col) {
+            this.canStop = false;
+            switch (o.type) {
+                case "wall":
+                    var movementVec = new PVector(this.velocity.x, this.velocity.y);
+                    movementVec.normalize();
+                    movementVec.mult(width + height);
+                    var movementLine = {x1: this.position.x, y1: this.position.y, x2: this.position.x - movementVec.x, y2: this.position.y - movementVec.y};
+                    var top = createLine(pos.x - r, pos.y - r, pos.x + o.width + r, pos.y - r);
+                    var botom = createLine(pos.x - r, pos.y + o.height + r, pos.x + o.width + r, pos.y + o.height + r);
+                    var left = createLine(pos.x - r, pos.y - r, pos.x - r, pos.y + o.height + r);
+                    var right = createLine(pos.x + o.width + r, pos.y - r, pos.x + o.width + r, pos.y + o.height + r);
+                    
+                    if (this.bounce(top, movementLine, 1, bounciness)){
+                        // so that only one gets called
+                    } else if (this.bounce(botom, movementLine, 1, bounciness)) {
 
-            } else if (this.bounce(left, movementLine, bounciness, 1)){
+                    } else if (this.bounce(left, movementLine, bounciness, 1)){
 
-            } else if (this.bounce(right, movementLine, bounciness, 1)){
+                    } else if (this.bounce(right, movementLine, bounciness, 1)){
 
-            }    
-            
+                    }
+                    break;
+                case "hill":
+                    this.applyForce(o.direc);
+                    break;
+            }
         }
     }
 };
@@ -277,20 +326,20 @@ BallSystem.prototype.run = function(){
         if(this.balls[i].show){
             this.balls[i].update();
             this.balls[i].draw();
-            noStroke();
-            fill(0, 100);
-            if(mouseX <= 300){
-                for(var j = 10; j <= 100; j += 10){
-                    ellipse(lerp(this.balls[i].position.x, mouseX - (this.balls[0].position.x - this.balls[i].position.x), j/100), lerp(this.balls[i].position.y, mouseY  - (this.balls[0].position.y - this.balls[i].position.y), j/100), (100 - j)/10, (100 - j)/10);
-                }
-            } else if(mouseX > 300){
-                for(var j = 10; j <= 100; j += 10){
-                    ellipse(lerp(this.balls[i].position.x, mouseX - (this.balls[1].position.x - this.balls[i].position.x), j/100), lerp(this.balls[i].position.y, mouseY  - (this.balls[1].position.y - this.balls[i].position.y), j/100), (100 - j)/10, (100 - j)/10);
+            if (this.balls[i].relaunch) {
+                noStroke();
+                fill(0, 100);
+                if(mouseX <= 300){
+                    for(var j = 10; j <= 100; j += 10){
+                        ellipse(lerp(this.balls[i].position.x, mouseX - (this.balls[0].position.x - this.balls[i].position.x), j/100), lerp(this.balls[i].position.y, mouseY  - (this.balls[0].position.y - this.balls[i].position.y), j/100), (100 - j)/10, (100 - j)/10);
+                    }
+                } else if(mouseX > 300){
+                    for(var j = 10; j <= 100; j += 10){
+                        ellipse(lerp(this.balls[i].position.x, mouseX - (this.balls[1].position.x - this.balls[i].position.x), j/100), lerp(this.balls[i].position.y, mouseY  - (this.balls[1].position.y - this.balls[i].position.y), j/100), (100 - j)/10, (100 - j)/10);
+                    }
                 }
             }
-        }
-        
-        
+        }     
     }
 };
 
@@ -338,6 +387,7 @@ var fillLevel =  function(){
             width: curObs.width,
             height: curObs.height,
             type: curObs.type,
+            direc: curObs.direc,
         }));
     }
     holePos = levels[levelInd].holes;
