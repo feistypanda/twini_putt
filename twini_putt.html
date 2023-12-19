@@ -1,28 +1,45 @@
 <!DOCTYPE html>
 <html> 
-  <head>
-    <title>Twini Putt</title> 
-  </head>
-  <body>
-	
-    <canvas id="mycanvas"></canvas> 
-  </body>
+    <head>
+        <title>Twini Putt</title> 
+        <style type="text/css">
+            #canvasp {
+                position: relative;
+                top: 150px;
+            }
+        </style>
+    </head>
+    <body>
+        <p style="text-align:center" id="canvasp">
+            <canvas id="mycanvas" align="center"></canvas> 
+        </p>
+    </body>
  
-  <script src="https://cdn.jsdelivr.net/processing.js/1.4.8/processing.min.js"></script> 
+    <script src="https://cdn.jsdelivr.net/processing.js/1.4.8/processing.min.js"></script> 
 
-  <script>
-  var programCode = function(processingInstance) {
-    with (processingInstance) {
+    <script>
+        var programCode = function(processingInstance) {
+            with (processingInstance) {
+
 size(600, 600); 
 
-var ballColor = color(255);
-var ballStroke = color(0, 0, 0);
-var ballStrokeWeight = 3;
-var bounciness = -0.8;
-var holePos = [];
-var numHoles = 0;
+angleMode = "radians";
 
-var levels = [{
+var ballColor = color(255); // the color of the balls
+var ballStroke = color(0, 0, 0); // stroke color of the balls
+var ballStrokeWeight = 3; // the stroke weight of the balls
+var ballSize = 10; // the size of the balls
+var bounciness = -0.8; // how much speed balls retain when bouncing
+var holePos = []; // the hole positions for the current level
+var numHoles = 0; // the total number of balls that are in a hole
+var holeSize = 15; // the size of the holes
+
+var p = function (x, y) {
+    return {x: x, y: y};
+};
+
+var levels = [
+{
     strt1: {x: 150, y: 500, origin: "left"},
     strt2: {x: 450, y: 500, origin: "right"},
     obstacles: [],
@@ -35,7 +52,17 @@ var levels = [{
 },{
     strt1: {x: 150, y: 500, origin: "left"},
     strt2: {x: 450, y: 200, origin: "right"},
-    obstacles: [{x: 426, y: 100, width: 50, height:50, type: "hill", direc: new PVector(0, 1)}],
+    obstacles: [{x: 426, y: 100, width: 50, height:50, type: "hill", direc: new PVector(0, 0.5)}],
+    holes: [{x: 150, y: 100}, {x: 450, y: 400}]
+},{
+    strt1: {x: 150, y: 500, origin: "left"},
+    strt2: {x: 450, y: 200, origin: "right"},
+    obstacles: [{width: 50, height: 10, type: "move", targets: [p(80, 70), p(180, 70), p(180, 170), p(80, 170)], speed: 0.5,}],
+    holes: [{x: 150, y: 100}, {x: 450, y: 400}]
+},{
+    strt1: {x: 150, y: 500, origin: "left"},
+    strt2: {x: 450, y: 200, origin: "right"},
+    obstacles: [{x: 1, y: 1, width: 99, height: 329, type: "water",}, {x: 200, y: 1, width: 96, height: 329, type: "water",}, {x: 1, y: 333, width: 99, height: 10, type: "wall",}, {x: 200, y: 333, width: 96, height: 10, type: "wall",}, {x: 304, y: 1, width: 395, height: 100, type: "water",}],
     holes: [{x: 150, y: 100}, {x: 450, y: 400}]
 },{
     strt1: {x: 150, y: 500, origin: "left"},
@@ -47,58 +74,55 @@ var levels = [{
     strt2: {x: 450, y: 500, origin: "right"},
     obstacles: [{x: 200, y: 100, width: 50, height:50, type: "wall"}, {x: 200, y: 300, width: 10, height: 400, type: "wall"}],
     holes: [{x: -285, y: 150}, {x: -450, y: 150}]
-}];
-var levelInd = 0;
+}
+]; // contains the level data for all of the levels
+
+var levelInd = 4; // indicates which level from the level array should be displayed
 
 var drawLine = function(line1){
     line(line1.x1, line1.y1, line1.x2, line1.y2);
-};
+}; // mostly for debugging
 
 var createLine = function(x1, y1, x2, y2){
     return {x1: x1, y1: y1, x2: x2, y2: y2};
-};
+}; // returns object with an x1, y1, x2, and y2
 
 var printLineStats = function(line){
     println("x1: " + line.x1);
     println("y1: " + line.y1);
     println("x2: " + line.x2);
     println("y2: " + line.y2);
-};
+}; // this is solely for debugging
 
 var findSign = function(n){
-    // finds sign of n. returns -1, 1, or 0
+    
     if (n === 0){
         return 0;
     }
 
-    return abs(n)/n
-}
+    return abs(n)/n;
+}; // finds sign of n. returns -1, 1, or 0
 
+// line intersection stuff
 {
 var calcSlope = function(line){
     return (line.y2 - line.y1) / (line.x2 - line.x1);
-    // returns the slope of the line
-};
+}; // returns the slope of the line
 
 var calcIntercept = function(line, slope){
     var x = line.x1;
     var y = line.y1;
     return y - slope * x;
-    // returns intercept (b in mx + b = y)
-};
+}; // returns intercept (b in mx + b = y)
 
-var isPointOnLine = function(line, point, slope){
-    slope = calcSlope(line);
-    var newSlope = calcSlope({x1: line.x1, y1: line.y1, x2: point.x, y2: point.y});
-    if(abs(newSlope - slope) <= 1 || line.x1 === line.x2){
-        if(point.x >= min(line.x1, line.x2) && point.x <= max(line.x1, line.x2) && point.y >= min(line.y1, line.y2) && point.y <= max(line.y1, line.y2)){
-            return true;
-        }
-    } else{
-        return false;
+var isPointOnLine = function(line, point){
+
+    if(point.x >= min(line.x1, line.x2) && point.x <= max(line.x1, line.x2) && point.y >= min(line.y1, line.y2) && point.y <= max(line.y1, line.y2)){
+        return true;
     }
-    // finds if a point is on a line (or close enough);
-};
+    return false;
+    
+}; // finds if a point is on a line
 
 var prepLine = function(line){
     if(line.x1 === line.x2){
@@ -106,7 +130,7 @@ var prepLine = function(line){
     }
     var m = calcSlope(line);
     return {m: m, b: calcIntercept(line, m), x1: line.x1,  y1: line.y1,  x2: line.x2,  y2: line.y2};
-};
+}; // takes a line object and injects slope, intercept, and vertical-ness boolean
 
 var findIntersection = function(line1, line2) {
     line1 = prepLine(line1);
@@ -130,15 +154,83 @@ var findIntersection = function(line1, line2) {
     var y = line1.m * x + line1.b;
     return {x: x, y: y, inter: isPointOnLine(line1, {x: x, y: y}, line1.m) && isPointOnLine(line2, {x: x, y: y}, line2.m)};
   }
-};
-} // line intersection stuff
+}; /* finds the intersection point of two lines, assuming the lines go infinitely in both directions */ } 
 
-var Obstacle = function(config){
-    this.position = new PVector(config.x, config.y);
+var Particle = function(position, type) {
+    this.acceleration = new PVector(0, 0);
+    this.velocity = new PVector(0, 0);
+    this.position = position.get();
+    this.timeToLive = 100.0;
+    this.type = type;
+};
+
+Particle.prototype.display = function() {
+    switch(this.type) {
+        case "splash":
+            noFill();
+            stroke(255, (this.timeToLive - 50) * 4);
+            strokeWeight(1);
+            ellipse(this.position.x, this.position.y, (100 - this.timeToLive) * 2, (100 - this.timeToLive) * 2);
+            break;
+    }
+};
+
+Particle.prototype.update = function() {
+    this.position.add(this.velocity);
+    this.timeToLive --;
+};
+
+Particle.prototype.run = function() {
+    this.update();
+    this.display();
+};
+
+var ParticleSystem = function(x, y, type, duration, numParticles) {
+    this.position = new PVector(x, y);
+    this.type = type;
+    this.particles = [];
+    this.duration = duration || false;
+    this.time = 0;
+    this.numParticles = numParticles || false;
+};
+
+ParticleSystem.prototype.addParticle = function() {
+    this.particles.push(new Particle(this.position, this.type));
+};
+
+ParticleSystem.prototype.run = function() {
+    this.time ++;
+    switch (this.type) {
+        case "splash":
+            
+            if (this.time % (this.duration/this.numParticles) === 0 && this.time < this.duration) {
+                this.addParticle();
+            }
+            for (var i = this.particles.length - 1; i >= 0; i--) {
+                this.particles[i].run();
+                if (this.particles[i].timeToLive <= 0){
+                    this.particles.splice(i, 1);
+                }
+            }
+    }
+}; 
+
+var p = new ParticleSystem(200, 200, "splash", 60, 5);
+
+var Obstacle = function(config) {
+
+    this.position = new PVector(config.x || config.targets[0].x, config.y || config.targets[0].y);
     this.type = config.type;
     this.width = config.width;
     this.height = config.height;
-    this.direc = config.direc;
+    this.direc = config.direc || false; // this is for hill blocks
+    this.targets = config.targets || false; // where the moving blocks will go to
+    this.curTarget = 1; // the target that it should be moving towards if its a moving block
+
+    if (this.targets){ // if its a moving block
+        this.angle = atan2(this.targets[1].y - this.targets[0].y, this.targets[1].x - this.targets[0].x);
+        this.speed = config.speed; // speed for moving blocks
+    }
 };
 
 Obstacle.prototype.draw = function() {
@@ -151,10 +243,12 @@ Obstacle.prototype.draw = function() {
             rect(pos.x, pos.y, this.width, this.height);
             break;
         case "hill":
-            fill(51, 33, 5);
-            stroke(153, 130, 55);
+            // fill(72, 194, 2);            
+            noFill();
+            stroke(42, 164, 0);
             strokeWeight(3);
-            rect(pos.x, pos.y, this.width, this.height);
+            rect(pos.x, pos.y, this.width, this.height, 2);
+            strokeJoin(ROUND);
             if(this.direc.x === 0 && this.direc.y !== 0){
                 var s = findSign(this.direc.y);
                 beginShape();
@@ -171,9 +265,47 @@ Obstacle.prototype.draw = function() {
                 endShape();
             }
             break;
+        case "move":
+            fill(150);
+            stroke(100);
+            strokeWeight(3);
+            rect(pos.x, pos.y, this.width, this.height, 5);
+            break;
+        case "water":
+            fill(70, 70, 255);
+            stroke(100, 100, 255);
+            strokeWeight(3);
+            rect(pos.x, pos.y, this.width, this.height, 2);
+            break;
         default:
             break;
     }
+};
+
+Obstacle.prototype.update = function() {
+    if (this.type === "move") {
+        if (dist(this.position.x, this.position.y, this.targets[this.curTarget].x, this.targets[this.curTarget].y) < this.speed) {
+            
+            this.position.x = this.targets[this.curTarget].x;
+            this.position.y = this.targets[this.curTarget].y;
+
+            this.curTarget ++;
+            if (this.curTarget >= this.targets.length) {
+                this.curTarget = 0;
+                this.angle = atan2(this.targets[this.curTarget].y - this.targets[this.targets.length - 1].y, this.targets[this.curTarget].x - this.targets[this.targets.length - 1].x);
+            } else {
+                this.angle = atan2(this.targets[this.curTarget].y - this.targets[this.curTarget - 1].y, this.targets[this.curTarget].x - this.targets[this.curTarget - 1].x);
+            }
+        } else {
+            this.position.x += cos(this.angle) * this.speed;
+            this.position.y += sin(this.angle) * this.speed;
+        }
+    }
+};
+
+Obstacle.prototype.run = function() {
+    this.update();
+    this.draw();
 };
 
 var ObstacleSystem = function(){
@@ -182,14 +314,15 @@ var ObstacleSystem = function(){
 
 ObstacleSystem.prototype.run = function() {
     for (var i in this.obstacles){
-        this.obstacles[i].draw();
+        this.obstacles[i].run();
     }
 };
 
-var obstacles = new ObstacleSystem();
+var obstacles = new ObstacleSystem(); // obstacles in the current level
 
 var GolfBall = function(config){
     this.position = new PVector(config.x, config.y);
+    this.startPosition = this.position.get();
     this.velocity = new PVector(0, 0, 0);
     this.acceleration = new PVector(0, 0, 0);
     this.mass = 3;
@@ -197,7 +330,10 @@ var GolfBall = function(config){
     this.originSide = config.originSide;
     this.relaunch = false;
     this.show = true;
+    this.inHole = false;
     this.canStop = true;
+    this.inWater = false;
+    this.waterResetDelay = 30;
 };
 
 GolfBall.prototype.draw = function() {
@@ -209,7 +345,6 @@ GolfBall.prototype.draw = function() {
 };
 
 GolfBall.prototype.applyForce = function(force){
-
     var f = PVector.div(force, this.mass);
     this.acceleration.add(f);
 };
@@ -222,37 +357,67 @@ GolfBall.prototype.isColliding = function(obstacle){
     return bPos.x + r > oPos.x && bPos.x - r < oPos.x + o.width && bPos.y + r > oPos.y && bPos.y - r < oPos.y + o.height;
 };
 
-GolfBall.prototype.bounce = function(side, movementLine, x, y){
-    var intersect = findIntersection(side, movementLine);
-    if(intersect.inter){ 
-        this.position.x = intersect.x;
-        this.position.y = intersect.y;
-        this.velocity.x *= x;
-        this.velocity.y *= y;
-        return true;
-    } else {
+GolfBall.prototype.bounce = function(movementLine, sides, bounceAngles){
+
+    var intersect;
+    var smallestDist = Infinity; // keeps track of the shortest distance from intersection to line
+    var smallestDistPos = {}; // position of closest intersection
+    var smallestDistInd = -1; // line that is being intersected
+
+    for (var i in sides) {
+        intersect = findIntersection(sides[i], movementLine);
+        if (intersect.inter) {
+            var d = dist(this.position.x, this.position.y, intersect.x, intersect.y);
+            if (d < smallestDist) {
+                smallestDist = d;
+                smallestDistPos = {x: intersect.x, y: intersect.y};
+                smallestDistInd = i;
+            }
+        }
+    }
+
+    if (smallestDistInd < 0) {
         return false;
     }
+
+    this.position.x = smallestDistPos.x;
+    this.position.y = smallestDistPos.y;
+
+    this.velocity.x *= bounceAngles[smallestDistInd].x;
+    this.velocity.y *= bounceAngles[smallestDistInd].y;
 };
 
 GolfBall.prototype.update = function() {
+
+    var pastX = this.position.x;
+    var pastY = this.position.y;
+
     this.velocity.add(this.acceleration);
-    this.velocity.mult(0.99);
+    this.velocity.mult(0.995);
     this.position.add(this.velocity);
+    this.acceleration.mult(0);
+
+    var r = this.size/2;
+
     if(this.velocity.mag() <= 0.3 && this.canStop){
         this.velocity.set(0, 0, 0);
         this.relaunch = true;
-    }
+    } // stop the ball if its going slow enough
     
     for(var i = 0; i < 2; i++){
-        if(dist(this.position.x, this.position.y, holePos[i].x, holePos[i].y) <= this.size/2 + 15/2 && this.velocity.mag() <= 3){
-            numHoles ++;
-            this.relaunch = false;
-            this.show = false;
+        var d = dist(this.position.x, this.position.y, holePos[i].x, holePos[i].y);
+        if(d <= this.size/2 + holeSize/2){
+            var ogVelocity = this.velocity.mag();
+            if (d <= holeSize/2 - this.size/2) {
+                this.relaunch = false;
+                this.show = false;
+            } else {
+                this.applyForce(new PVector((holePos[i].x - this.position.x)/14, (holePos[i].y - this.position.y)/14));
+                this.velocity.limit(ogVelocity);
+            }            
         }
-    }
-    this.acceleration.mult(0);
-    var r = this.size/2;
+    } // check if the ball is in a hole
+
     if(this.position.x - r < 0){
         this.position.x = r;
         this.velocity.x *= bounciness;
@@ -265,7 +430,7 @@ GolfBall.prototype.update = function() {
     }  else if(this.position.y + r > height){
         this.position.y = height - r;
         this.velocity.y *= bounciness;
-    }
+    } // bounce off of the edges of the screen
     
     switch(this.originSide){
         case "left":
@@ -280,38 +445,54 @@ GolfBall.prototype.update = function() {
                 this.velocity.x *= bounciness;
             }
             break;
-    }
-    this.canStop = true;
+    } // keep the ball on its side
+
+    this.canStop = true; // will be set to false later if needed
+
     for(var i in obstacles.obstacles){
+
         var col = this.isColliding(obstacles.obstacles[i]);
-        var o = obstacles.obstacles[i];
-        var pos = o.position;
+        var o = obstacles.obstacles[i]; // to easily access properties of the obstacle
+        var pos = o.position; // to easily access the position of the obstacle
+
         if (col) {
-            this.canStop = false;
-            switch (o.type) {
-                case "wall":
-                    var movementVec = new PVector(this.velocity.x, this.velocity.y);
-                    movementVec.normalize();
-                    movementVec.mult(width + height);
-                    var movementLine = {x1: this.position.x, y1: this.position.y, x2: this.position.x - movementVec.x, y2: this.position.y - movementVec.y};
-                    var top = createLine(pos.x - r, pos.y - r, pos.x + o.width + r, pos.y - r);
-                    var botom = createLine(pos.x - r, pos.y + o.height + r, pos.x + o.width + r, pos.y + o.height + r);
-                    var left = createLine(pos.x - r, pos.y - r, pos.x - r, pos.y + o.height + r);
-                    var right = createLine(pos.x + o.width + r, pos.y - r, pos.x + o.width + r, pos.y + o.height + r);
-                    
-                    if (this.bounce(top, movementLine, 1, bounciness)){
-                        // so that only one gets called
-                    } else if (this.bounce(botom, movementLine, 1, bounciness)) {
+            
+            this.canStop = false; // so that it doesn't go into a wall and then stop
 
-                    } else if (this.bounce(left, movementLine, bounciness, 1)){
+            if (o.type === "wall" || o.type === "move") {
 
-                    } else if (this.bounce(right, movementLine, bounciness, 1)){
+                var movementVec;
 
-                    }
-                    break;
-                case "hill":
-                    this.applyForce(o.direc);
-                    break;
+                if (o.type === "move") {
+                    movementVec = new PVector((this.position.x - pastX) + (cos(o.angle) * o.speed), (this.position.y - pastY) + (sin(o.angle) * o.speed)); // subtract the velocity of the obstacle, if its a moving obstacle
+                } else {
+                    movementVec = new PVector((this.position.x - pastX), (this.position.y - pastY));
+                } 
+
+                movementVec.normalize();
+                movementVec.mult(width + height);
+                var movementLine = {x1: this.position.x, y1: this.position.y, x2: this.position.x - movementVec.x, y2: this.position.y - movementVec.y};
+                
+                movementVec.normalize();
+
+                // make the movement line start further back
+                movementLine.x1 += movementVec.x * this.size/2; 
+                movementLine.y1 += movementVec.y * this.size/2;
+                
+                var top = createLine(pos.x - r, pos.y - r, pos.x + o.width + r, pos.y - r);
+                var botom = createLine(pos.x - r - 1, pos.y + o.height + r + 1, pos.x + o.width + r + 1, pos.y + o.height + r + 1);
+                var left = createLine(pos.x - r - 1, pos.y - r - 1, pos.x - r - 1, pos.y + o.height + r + 1);
+                var right = createLine(pos.x + o.width + r + 1, pos.y - r - 1, pos.x + o.width + r + 1, pos.y + o.height + r + 1);
+
+                var bounceAngles = [p(1, bounciness), p(1, bounciness), p(bounciness, 1), p(bounciness, 1)];
+                var sides = [top, botom, left, right];
+
+                this.bounce(movementLine, sides, bounceAngles);
+
+            } else if (o.type === "hill") {
+                this.applyForce(o.direc);
+            } else if (o.type === "water") {
+                this.inWater = true;
             }
         }
     }
@@ -319,17 +500,17 @@ GolfBall.prototype.update = function() {
 
 var BallSystem = function(){
     this.balls = [];
-};
+}; // handles all of the golf balls
 
 BallSystem.prototype.run = function(){
     for (var i = this.balls.length - 1; i >= 0; i--) {
         if(this.balls[i].show){
             this.balls[i].update();
             this.balls[i].draw();
-            if (this.balls[i].relaunch) {
+            if (this.balls[i].relaunch) { // draw the doted aim thing
                 noStroke();
                 fill(0, 100);
-                if(mouseX <= 300){
+                if(mouseX <= width/2){
                     for(var j = 10; j <= 100; j += 10){
                         ellipse(lerp(this.balls[i].position.x, mouseX - (this.balls[0].position.x - this.balls[i].position.x), j/100), lerp(this.balls[i].position.y, mouseY  - (this.balls[0].position.y - this.balls[i].position.y), j/100), (100 - j)/10, (100 - j)/10);
                     }
@@ -339,46 +520,75 @@ BallSystem.prototype.run = function(){
                     }
                 }
             }
-        }     
+        } else if (!this.balls[i].inWater){
+            this.balls[i].size -= 0.1;
+            if (this.balls[i].size <= 0 && !this.balls[i].inHole) {
+                numHoles ++;
+                this.balls[i].inHole = true;
+            } else {
+                this.balls[i].draw();    
+            }
+            
+        }
+        if (this.balls[i].inWater) {
+            if (this.balls[i].show) {
+               
+            }
+            this.balls[i].show = false;
+            this.balls[i].waterResetDelay --;
+            if (this.balls[i].waterResetDelay <= 0) {
+                this.balls[i].waterResetDelay = 30;
+                this.balls[i].show = true;
+                this.balls[i].inWater = false;
+                this.balls[i].position.set(this.balls[i].startPosition);
+                this.balls[i].velocity.mult(0);
+            }
+            
+        }
+             
     }
 };
 
-BallSystem.prototype.launch = function(){
+BallSystem.prototype.launch = function(){ // launch the balls
     for (var i = this.balls.length - 1; i >= 0; i--) {
-        if(this.balls[i].relaunch){
-            var dist;
+        if(this.balls[i].relaunch){ // only launch if the balls are allowed to
+            var distance; // distance between mouse and the golf ball, but in a PVector
             if(mouseX <= 300){
-                dist = new PVector(mouseX - (this.balls[0].position.x - this.balls[i].position.x) - this.balls[i].position.x, mouseY  - (this.balls[0].position.y - this.balls[i].position.y) - this.balls[i].position.y);
+                distance = new PVector(mouseX - (this.balls[0].position.x - this.balls[i].position.x) - this.balls[i].position.x, mouseY  - (this.balls[0].position.y - this.balls[i].position.y) - this.balls[i].position.y);
             } else if (mouseX > 300){
-                dist = new PVector(mouseX - (this.balls[1].position.x - this.balls[i].position.x) - this.balls[i].position.x, mouseY  - (this.balls[1].position.y - this.balls[i].position.y) - this.balls[i].position.y);
+                distance = new PVector(mouseX - (this.balls[1].position.x - this.balls[i].position.x) - this.balls[i].position.x, mouseY  - (this.balls[1].position.y - this.balls[i].position.y) - this.balls[i].position.y);
             }
-            dist.div(-8);
-            this.balls[i].applyForce(dist);
-            this.balls[i].relaunch = false;
-            
+            distance.div(-8); // negative so the balls go away from the mouse
+            this.balls[i].applyForce(distance);
+            this.balls[i].relaunch = false; // after you launch, set the relaunch to false so it cant launch again until the ball stops
         }
     }
 };
 
-var golfBalls = new BallSystem();
+var golfBalls = new BallSystem(); // balls in the current level
 
-
-
-var fillLevel =  function(){
+var fillLevel =  function(){ // takes the info from the level array, and then puts it into the global variables for the current level
+    
+    // clear the arrays
     golfBalls.balls = [];
     obstacles.obstacles = [];
+
+    // add the golf balls for the current level
     golfBalls.balls.push(new GolfBall({
         x: levels[levelInd].strt1.x,
         y: levels[levelInd].strt1.y,
-        size: 10,
+        size: ballSize,
         originSide: levels[levelInd].strt1.origin,
     }));
+
     golfBalls.balls.push(new GolfBall({
         x: levels[levelInd].strt2.x,
         y: levels[levelInd].strt2.y,
-        size: 10,
+        size: ballSize,
         originSide: levels[levelInd].strt2.origin,
     }));
+
+    // add the obstacles for the current level
     for(var i = 0; i < levels[levelInd].obstacles.length; i++){
         var curObs = levels[levelInd].obstacles[i];
         obstacles.obstacles.push(new Obstacle({
@@ -388,16 +598,19 @@ var fillLevel =  function(){
             height: curObs.height,
             type: curObs.type,
             direc: curObs.direc,
+            targets: curObs.targets,
+            speed: curObs.speed,
         }));
     }
-    holePos = levels[levelInd].holes;
-    numHoles = 0;
+
+    holePos = levels[levelInd].holes; // hole positions for the current level
+    numHoles = 0; // the number of holes made
 };
 
 fillLevel();
 
 var play = function(){
-    fill(92, 204, 12, 200);
+    fill(92, 204, 12);
     noStroke();
     rect(0, 0, width, height);
     stroke(0);
@@ -410,13 +623,12 @@ var play = function(){
     }
     obstacles.run();
     golfBalls.run();
+    p.run();
     if(numHoles >= 2){
         levelInd ++;
         fillLevel();
     }
 };
-
-
 
 var draw = function() {
     play();
@@ -426,14 +638,11 @@ mouseReleased = function(){
     golfBalls.launch();
 };
 
+            }
+        };
 
-}};
+        var canvas = document.querySelector("#mycanvas"); 
+        var processingInstance = new Processing(canvas, programCode); 
 
-  // Get the canvas that ProcessingJS will use
-  var canvas = document.getElementById("mycanvas"); 
-  // Pass the function to ProcessingJS constructor
-  var processingInstance = new Processing(canvas, programCode); 
-
-
-  </script>
-</html>
+    </script>
+</html> 
