@@ -156,6 +156,7 @@ var findIntersection = function(line1, line2) {
   }
 }; /* finds the intersection point of two lines, assuming the lines go infinitely in both directions */ } 
 
+{
 var Particle = function(position, type) {
     this.acceleration = new PVector(0, 0);
     this.velocity = new PVector(0, 0);
@@ -168,7 +169,7 @@ Particle.prototype.display = function() {
     switch(this.type) {
         case "splash":
             noFill();
-            stroke(255, (this.timeToLive - 50) * 4);
+            stroke(255, (this.timeToLive - 50) * 2);
             strokeWeight(1);
             ellipse(this.position.x, this.position.y, (100 - this.timeToLive) * 2, (100 - this.timeToLive) * 2);
             break;
@@ -199,7 +200,7 @@ ParticleSystem.prototype.addParticle = function() {
 };
 
 ParticleSystem.prototype.run = function() {
-    this.time ++;
+    
     switch (this.type) {
         case "splash":
             
@@ -213,9 +214,27 @@ ParticleSystem.prototype.run = function() {
                 }
             }
     }
+    this.time ++;
 }; 
 
-var p = new ParticleSystem(200, 200, "splash", 60, 5);
+var ParticleSystems = function() {
+    this.particleSystems = [];
+};
+
+ParticleSystems.prototype.add = function(x, y, type, duration, numParticles) {
+    this.particleSystems.push(new ParticleSystem(x, y, type, duration, numParticles));
+};
+
+ParticleSystems.prototype.run = function() {
+    for (var i = this.particleSystems.length - 1; i >= 0; i--) {
+        this.particleSystems[i].run();
+        if (this.particleSystems[i].particles.length <= 0 && this.particleSystems[i].time > this.particleSystems[i].duration) {
+            this.particleSystems.splice(i, 1);
+        }
+    }
+};
+
+var gameParticles = new ParticleSystems();} // particles
 
 var Obstacle = function(config) {
 
@@ -480,9 +499,9 @@ GolfBall.prototype.update = function() {
                 movementLine.y1 += movementVec.y * this.size/2;
                 
                 var top = createLine(pos.x - r, pos.y - r, pos.x + o.width + r, pos.y - r);
-                var botom = createLine(pos.x - r - 1, pos.y + o.height + r + 1, pos.x + o.width + r + 1, pos.y + o.height + r + 1);
-                var left = createLine(pos.x - r - 1, pos.y - r - 1, pos.x - r - 1, pos.y + o.height + r + 1);
-                var right = createLine(pos.x + o.width + r + 1, pos.y - r - 1, pos.x + o.width + r + 1, pos.y + o.height + r + 1);
+                var botom = createLine(pos.x - r, pos.y + o.height + r, pos.x + o.width + r, pos.y + o.height + r);
+                var left = createLine(pos.x - r, pos.y - r, pos.x - r, pos.y + o.height + r);
+                var right = createLine(pos.x + o.width + r, pos.y - r, pos.x + o.width + r, pos.y + o.height + r);
 
                 var bounceAngles = [p(1, bounciness), p(1, bounciness), p(bounciness, 1), p(bounciness, 1)];
                 var sides = [top, botom, left, right];
@@ -532,7 +551,10 @@ BallSystem.prototype.run = function(){
         }
         if (this.balls[i].inWater) {
             if (this.balls[i].show) {
-               
+                var v = this.balls[i].velocity.get();
+                v.normalize();
+                v.mult(10)
+                gameParticles.add(this.balls[i].position.x + v.x, this.balls[i].position.y + v.y, "splash", 30, 3);
             }
             this.balls[i].show = false;
             this.balls[i].waterResetDelay --;
@@ -623,7 +645,7 @@ var play = function(){
     }
     obstacles.run();
     golfBalls.run();
-    p.run();
+    gameParticles.run();
     if(numHoles >= 2){
         levelInd ++;
         fillLevel();
