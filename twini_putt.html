@@ -42,18 +42,18 @@ var levels = [
 {
     strt1: {x: 150, y: 500, origin: "left"},
     strt2: {x: 450, y: 500, origin: "right"},
-    obstacles: [],
+    obstacles: [{x: 50, y: 100, width: 195, height:20, type: "wall"}, {x: 350, y: 100, width: 195, height:20, type: "wall"},],
     holes: [{x: 150, y: 150}, {x: 450, y: 150}]
 },{
     strt1: {x: 150, y: 500, origin: "left"},
-    strt2: {x: 450, y: 200, origin: "right"},
-    obstacles: [{x: 426, y: 100, width: 50, height:50, type: "wall"}],
-    holes: [{x: 150, y: 100}, {x: 450, y: 400}]
+    strt2: {x: 450, y: 100, origin: "right"},
+    obstacles: [{x: 50, y: 290, width: 246, height:20, type: "wall"}, {x: 400, y: 290, width: 199, height:20, type: "wall"},],
+    holes: [{x: 150, y: 100}, {x: 450, y: 500}]
 },{
     strt1: {x: 150, y: 500, origin: "left"},
-    strt2: {x: 450, y: 200, origin: "right"},
-    obstacles: [{x: 426, y: 100, width: 50, height:50, type: "hill", direc: new PVector(0, 0.5)}],
-    holes: [{x: 150, y: 100}, {x: 450, y: 400}]
+    strt2: {x: 450, y: 500, origin: "right"},
+    obstacles: [{x: 1, y: 180, width: 240, height: 280, type: "hill", direc: new PVector(0.5, 0)}, {x: 359, y: 180, width: 240, height: 280, type: "hill", direc: new PVector(-0.5, 0)}, {x: 1, y: 100, width: 296, height:20, type: "wall"}, {x: 303, y: 100, width: 296, height:20, type: "wall"}],
+    holes: [{x: 150, y: 150}, {x: 450, y: 150}]
 },{
     strt1: {x: 150, y: 500, origin: "left"},
     strt2: {x: 450, y: 200, origin: "right"},
@@ -67,7 +67,7 @@ var levels = [
 },{
     strt1: {x: 150, y: 500, origin: "left"},
     strt2: {x: 450, y: 500, origin: "right"},
-    obstacles: [{x: 200, y: 100, width: 50, height:50, type: "wall"}, {x: 200, y: 300, width: 10, height: 400, type: "wall"}],
+    obstacles: [{x: 200, y: 100, width: 50, height:50, type: "sand"}],
     holes: [{x: 285, y: 150}, {x: 450, y: 150}]
 },{
     strt1: {x: 150, y: 500, origin: "left"},
@@ -77,7 +77,7 @@ var levels = [
 }
 ]; // contains the level data for all of the levels
 
-var levelInd = 4; // indicates which level from the level array should be displayed
+var levelInd = 0; // indicates which level from the level array should be displayed
 
 var drawLine = function(line1){
     line(line1.x1, line1.y1, line1.x2, line1.y2);
@@ -238,17 +238,38 @@ var gameParticles = new ParticleSystems();} // particles
 
 var Obstacle = function(config) {
 
-    this.position = new PVector(config.x || config.targets[0].x, config.y || config.targets[0].y);
+    this.shape = config.shape || "rect";
     this.type = config.type;
-    this.width = config.width;
-    this.height = config.height;
+
+    if (this.type === "wall" || this.type === "move" || this.type === "hill") {
+        this.shape = "rect";
+    }
+
+    if (this.shape === "rect") {
+        this.position = new PVector(config.x || config.targets[0].x, config.y || config.targets[0].y);
+        this.width = config.width;
+        this.height = config.height;
+    } else if (this.shape === "line") {
+
+    }
+
     this.direc = config.direc || false; // this is for hill blocks
     this.targets = config.targets || false; // where the moving blocks will go to
     this.curTarget = 1; // the target that it should be moving towards if its a moving block
 
-    if (this.targets){ // if its a moving block
+    if (this.type === "move"){ // if its a moving block
         this.angle = atan2(this.targets[1].y - this.targets[0].y, this.targets[1].x - this.targets[0].x);
         this.speed = config.speed; // speed for moving blocks
+    }
+
+    if (this.type === "hill" ) {
+        if (this.width % 40 !== 0) {
+            this.width += this.width % 40;          
+        }
+        if (this.height % 40 !== 0) {
+            this.height += this.height % 40;
+        }
+        
     }
 };
 
@@ -262,7 +283,7 @@ Obstacle.prototype.draw = function() {
             rect(pos.x, pos.y, this.width, this.height);
             break;
         case "hill":
-            // fill(72, 194, 2);            
+                       
             noFill();
             stroke(42, 164, 0);
             strokeWeight(3);
@@ -270,18 +291,23 @@ Obstacle.prototype.draw = function() {
             strokeJoin(ROUND);
             if(this.direc.x === 0 && this.direc.y !== 0){
                 var s = findSign(this.direc.y);
-                beginShape();
-                    vertex(this.position.x + this.width/8, (this.position.y + this.height/2) - (this.height/2 * s) + this.height/8 * s);
-                    vertex(this.position.x + this.width/2, (this.position.y + this.height/2) + (this.height/2 * s) - this.height/8 * s);
-                    vertex(this.position.x + this.width - this.width/8, (this.position.y + this.height/2) - (this.height/2 * s) + this.height/8 * s);
-                endShape();
+                for (var i = 0; i <= this.width/40 - 1; i ++) {
+                    beginShape();
+                        vertex(this.position.x + i * 40 + 12, (this.position.y + this.height/2) - (this.height/2 * s) + 6 * s);
+                        vertex(this.position.x + i * 40 + 20, (this.position.y + this.height/2) + (this.height/2 * s) - 6 * s);
+                        vertex(this.position.x + i * 40 + 28, (this.position.y + this.height/2) - (this.height/2 * s) + 6 * s);
+                    endShape();
+                }
+                
             } else if(this.direc.y === 0 && this.direc.x !== 0){
                 var s = findSign(this.direc.x);
-                beginShape();
-                    vertex((this.position.x + this.width/2) - (this.width/2 * s) + this.width/8 * s, this.position.y + this.height/8);
-                    vertex((this.position.x + this.width/2) + (this.width/2 * s) - this.width/8 * s, this.position.y + this.height/2);
-                    vertex((this.position.x + this.width/2) - (this.width/2 * s) + this.width/8 * s, this.position.y + this.height - this.height/8);
-                endShape();
+                for (var i = 0; i <= this.height/40 - 1; i ++) {
+                    beginShape();
+                        vertex((this.position.x + this.width/2) - (this.width/2 * s) + 6 * s, this.position.y + i * 40 + 12);
+                        vertex((this.position.x + this.width/2) + (this.width/2 * s) - 6 * s, this.position.y + i * 40 + 20);
+                        vertex((this.position.x + this.width/2) - (this.width/2 * s) + 6 * s, this.position.y + i * 40 + 34);
+                    endShape();
+                }
             }
             break;
         case "move":
@@ -293,6 +319,12 @@ Obstacle.prototype.draw = function() {
         case "water":
             fill(70, 70, 255);
             stroke(100, 100, 255);
+            strokeWeight(3);
+            rect(pos.x, pos.y, this.width, this.height, 2);
+            break;
+        case "sand":
+            fill(227, 211, 132);
+            stroke(181, 159, 79);
             strokeWeight(3);
             rect(pos.x, pos.y, this.width, this.height, 2);
             break;
@@ -349,7 +381,8 @@ var GolfBall = function(config){
     this.originSide = config.originSide;
     this.relaunch = false;
     this.show = true;
-    this.inHole = false;
+    this.inHole = false; // when to go to the next level
+    this.hitHole = false; // when to start the animation
     this.canStop = true;
     this.inWater = false;
     this.waterResetDelay = 30;
@@ -369,11 +402,15 @@ GolfBall.prototype.applyForce = function(force){
 };
 
 GolfBall.prototype.isColliding = function(obstacle){
+    
     var bPos = this.position;
     var oPos = obstacle.position;
     var r = this.size/2;
     var o = obstacle;
-    return bPos.x + r > oPos.x && bPos.x - r < oPos.x + o.width && bPos.y + r > oPos.y && bPos.y - r < oPos.y + o.height;
+    if (o.shape === "rect") {
+        return bPos.x + r > oPos.x && bPos.x - r < oPos.x + o.width && bPos.y + r > oPos.y && bPos.y - r < oPos.y + o.height;    
+    }
+    
 };
 
 GolfBall.prototype.bounce = function(movementLine, sides, bounceAngles){
@@ -412,7 +449,7 @@ GolfBall.prototype.update = function() {
     var pastY = this.position.y;
 
     this.velocity.add(this.acceleration);
-    this.velocity.mult(0.995);
+    this.velocity.mult(0.98);
     this.position.add(this.velocity);
     this.acceleration.mult(0);
 
@@ -430,6 +467,7 @@ GolfBall.prototype.update = function() {
             if (d <= holeSize/2 - this.size/2) {
                 this.relaunch = false;
                 this.show = false;
+                this.hitHole = true;
             } else {
                 this.applyForce(new PVector((holePos[i].x - this.position.x)/14, (holePos[i].y - this.position.y)/14));
                 this.velocity.limit(ogVelocity);
@@ -512,6 +550,9 @@ GolfBall.prototype.update = function() {
                 this.applyForce(o.direc);
             } else if (o.type === "water") {
                 this.inWater = true;
+            } else if (o.type === "sand") {
+                this.velocity.mult(0.6);
+                this.canStop = true;
             }
         }
     }
@@ -539,7 +580,7 @@ BallSystem.prototype.run = function(){
                     }
                 }
             }
-        } else if (!this.balls[i].inWater){
+        } else if (this.balls[i].hitHole){
             this.balls[i].size -= 0.1;
             if (this.balls[i].size <= 0 && !this.balls[i].inHole) {
                 numHoles ++;
@@ -553,7 +594,7 @@ BallSystem.prototype.run = function(){
             if (this.balls[i].show) {
                 var v = this.balls[i].velocity.get();
                 v.normalize();
-                v.mult(10)
+                v.mult(10);
                 gameParticles.add(this.balls[i].position.x + v.x, this.balls[i].position.y + v.y, "splash", 30, 3);
             }
             this.balls[i].show = false;
@@ -635,9 +676,6 @@ var play = function(){
     fill(92, 204, 12);
     noStroke();
     rect(0, 0, width, height);
-    stroke(0);
-    strokeWeight(5);
-    line(width/2, -10, width/2, height + 10);
     fill(0);
     noStroke();
     for(var i in holePos){
@@ -646,6 +684,9 @@ var play = function(){
     obstacles.run();
     golfBalls.run();
     gameParticles.run();
+    stroke(0);
+    strokeWeight(5);
+    line(width/2, -10, width/2, height + 10);
     if(numHoles >= 2){
         levelInd ++;
         fillLevel();
