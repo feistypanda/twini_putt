@@ -38,6 +38,10 @@ var p = function (x, y) {
     return {x: x, y: y};
 };
 
+var createLine = function(x1, y1, x2, y2){
+    return {x1: x1, y1: y1, x2: x2, y2: y2};
+}; // returns object with an x1, y1, x2, and y2
+
 var levels = [
 {
     strt1: {x: 150, y: 500, origin: "left"},
@@ -57,18 +61,18 @@ var levels = [
 },{
     strt1: {x: 150, y: 500, origin: "left"},
     strt2: {x: 450, y: 200, origin: "right"},
-    obstacles: [{width: 50, height: 10, type: "move", targets: [p(80, 70), p(180, 70), p(180, 170), p(80, 170)], speed: 0.5,}],
-    holes: [{x: 150, y: 100}, {x: 450, y: 400}]
-},{
-    strt1: {x: 150, y: 500, origin: "left"},
-    strt2: {x: 450, y: 200, origin: "right"},
     obstacles: [{x: 1, y: 1, width: 99, height: 329, type: "water",}, {x: 200, y: 1, width: 96, height: 329, type: "water",}, {x: 1, y: 333, width: 99, height: 10, type: "wall",}, {x: 200, y: 333, width: 96, height: 10, type: "wall",}, {x: 304, y: 1, width: 395, height: 100, type: "water",}],
     holes: [{x: 150, y: 100}, {x: 450, y: 400}]
 },{
-    strt1: {x: 150, y: 500, origin: "left"},
+  strt1: {x: 150, y: 500, origin: "left"},
     strt2: {x: 450, y: 500, origin: "right"},
-    obstacles: [{x: 200, y: 100, width: 50, height:50, type: "sand"}],
-    holes: [{x: 285, y: 150}, {x: 450, y: 150}]
+    obstacles: [{x1: 200, y1: 350, x2: 400, y2: 350, strokeWeight: 50, type: "water", shape: "line"}, {x1: -100, y1: 250, x2: 150, y2: 250, strokeWeight: 50, type: "sand", shape: "line"}, {x1: 400, y1: -500, x2: 400, y2: 250, strokeWeight: 50, type: "water", shape: "line"}, {x1: 500, y1: 100, x2: 500, y2: 250, strokeWeight: 50, type: "water", shape: "line"}, {x: 195, y: 23, width: 80, height: 260, type: "hill", direc: new PVector(0, -0.5)}, {x: 1, y: 200, width: 190, height: 10, type: "wall",}, {x: 570, y: -10, width: 99, height: 100, type: "water",}],
+    holes: [{x: 150, y: 150}, {x: 550, y: 150}]
+},{
+    strt1: {x: 150, y: 500, origin: "left"},
+    strt2: {x: 450, y: 200, origin: "right"},
+    obstacles: [{width: 50, height: 10, type: "move", targets: [p(80, 70), p(180, 70), p(180, 170), p(80, 170)], speed: 0.5,}],
+    holes: [{x: 150, y: 100}, {x: 450, y: 400}]
 },{
     strt1: {x: 150, y: 500, origin: "left"},
     strt2: {x: 450, y: 500, origin: "right"},
@@ -77,15 +81,11 @@ var levels = [
 }
 ]; // contains the level data for all of the levels
 
-var levelInd = 0; // indicates which level from the level array should be displayed
+var levelInd = 4; // indicates which level from the level array should be displayed
 
 var drawLine = function(line1){
     line(line1.x1, line1.y1, line1.x2, line1.y2);
 }; // mostly for debugging
-
-var createLine = function(x1, y1, x2, y2){
-    return {x1: x1, y1: y1, x2: x2, y2: y2};
-}; // returns object with an x1, y1, x2, and y2
 
 var printLineStats = function(line){
     println("x1: " + line.x1);
@@ -155,6 +155,21 @@ var findIntersection = function(line1, line2) {
     return {x: x, y: y, inter: isPointOnLine(line1, {x: x, y: y}, line1.m) && isPointOnLine(line2, {x: x, y: y}, line2.m)};
   }
 }; /* finds the intersection point of two lines, assuming the lines go infinitely in both directions */ } 
+
+var lineToCirc = function (line, circ) {
+    var lineMag = dist(line.x1, line.y1, line.x2, line.y2);
+    var distToCirc = dist(line.x1, line.y1, circ.position.x, circ.position.y);
+    var lineAngle = atan2(line.y2 - line.y1, line.x2 - line.x1);
+    var lineCircAngle = atan2(circ.position.y - line.y1, circ.position.x - line.x1);
+    var newX = line.x1 + cos(lineCircAngle - lineAngle) * distToCirc;
+    var newY = line.y1 + sin(lineCircAngle - lineAngle) * distToCirc;
+    var newLine = createLine(line.x1, line.y1, line.x1 + lineMag, line.y1);
+    var constX = constrain(newX, newLine.x1, newLine.x2);
+    if (dist (constX, newLine.y1, newX, newY) < circ.r + line.strokeWeight/2){
+        return true;
+    }
+    return false;
+};
 
 {
 var Particle = function(position, type) {
@@ -250,7 +265,11 @@ var Obstacle = function(config) {
         this.width = config.width;
         this.height = config.height;
     } else if (this.shape === "line") {
-
+        this.x1 = config.x1;
+        this.x2 = config.x2;
+        this.y1 = config.y1;
+        this.y2 = config.y2;
+        this.strokeWeight = config.strokeWeight;
     }
 
     this.direc = config.direc || false; // this is for hill blocks
@@ -274,7 +293,9 @@ var Obstacle = function(config) {
 };
 
 Obstacle.prototype.draw = function() {
-    var pos = this.position;
+    if (this.shape === "rect") {
+        var pos = this.position;
+    }
     switch(this.type){
         case "wall":
             fill(230, 192, 41);
@@ -317,16 +338,34 @@ Obstacle.prototype.draw = function() {
             rect(pos.x, pos.y, this.width, this.height, 5);
             break;
         case "water":
-            fill(70, 70, 255);
-            stroke(100, 100, 255);
-            strokeWeight(3);
-            rect(pos.x, pos.y, this.width, this.height, 2);
+            if (this.shape === "rect") {
+                fill(70, 70, 255);
+                stroke(100, 100, 255);
+                strokeWeight(3);
+                rect(pos.x, pos.y, this.width, this.height, 2);    
+            } else if (this.shape === "line") {
+                stroke(100, 100, 255);
+                strokeWeight(this.strokeWeight + 6);
+                drawLine(this);
+                stroke(70, 70, 255);
+                strokeWeight(this.strokeWeight);
+                drawLine(this);
+            }
             break;
         case "sand":
-            fill(227, 211, 132);
-            stroke(181, 159, 79);
-            strokeWeight(3);
-            rect(pos.x, pos.y, this.width, this.height, 2);
+            if (this.shape === "rect") {
+                fill(227, 211, 132);
+                stroke(181, 159, 79);
+                strokeWeight(3);
+                rect(pos.x, pos.y, this.width, this.height, 2);    
+            } else if (this.shape === "line") {
+                stroke(181, 159, 79);
+                strokeWeight(this.strokeWeight + 6);
+                drawLine(this);
+                stroke(227, 211, 132);
+                strokeWeight(this.strokeWeight);
+                drawLine(this);
+            }
             break;
         default:
             break;
@@ -378,6 +417,7 @@ var GolfBall = function(config){
     this.acceleration = new PVector(0, 0, 0);
     this.mass = 3;
     this.size = config.size;
+    this.r = this.size/2;
     this.originSide = config.originSide;
     this.relaunch = false;
     this.show = true;
@@ -409,8 +449,9 @@ GolfBall.prototype.isColliding = function(obstacle){
     var o = obstacle;
     if (o.shape === "rect") {
         return bPos.x + r > oPos.x && bPos.x - r < oPos.x + o.width && bPos.y + r > oPos.y && bPos.y - r < oPos.y + o.height;    
-    }
-    
+    } else if (o.shape === "line") {
+        return lineToCirc(o, this);
+    }   
 };
 
 GolfBall.prototype.bounce = function(movementLine, sides, bounceAngles){
@@ -513,6 +554,7 @@ GolfBall.prototype.update = function() {
         var pos = o.position; // to easily access the position of the obstacle
 
         if (col) {
+
             
             this.canStop = false; // so that it doesn't go into a wall and then stop
 
@@ -663,6 +705,12 @@ var fillLevel =  function(){ // takes the info from the level array, and then pu
             direc: curObs.direc,
             targets: curObs.targets,
             speed: curObs.speed,
+            x1: curObs.x1,
+            x2: curObs.x2,
+            y1: curObs.y1,
+            y2: curObs.y2,
+            strokeWeight: curObs.strokeWeight,
+            shape: curObs.shape,
         }));
     }
 
