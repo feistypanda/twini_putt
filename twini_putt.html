@@ -21,13 +21,16 @@
         var programCode = function(processingInstance) {
             with (processingInstance) {
 
-size(600, 600); 
-
+ 
 
 {
+size(600, 600, P2D);
 angleMode = "radians";
 smooth();
-frameRate(60);} // setup
+frameRate(60);
+textAlign(CENTER);
+var ARIAL_BLACK = createFont("arial black");
+var ARIAL = createFont("arial");} // setup
 
 {
 var ballColor = color(255); // the color of the balls
@@ -43,33 +46,44 @@ var holeSize = 15; // the size of the holes
 var topBarHeight = 30; // the height of the top bar
 var strokes = 0;
 var golfBalls;
-var showHitBoxes = false;} // vars
+var showHitBoxes = false;
+var scene = "home";
+var par;
+var transImg;
+var totalScore = 0;
+var mouseDown = false;
+var levelSelectVars = {
+    timeIn: 0,
+    target: 0,
+    offSet: 0,
+};
+var canLaunch = false;} // vars
 
-var levelInd = 1; // indicates which level from the level array should be displayed
-
-{
+var levelInd = 5; // indicates which level from the level array should be displayed
+var levelsPlayed = levelInd;
+//{
 function p(x, y) {
     return {x: x, y: y};
-}; // makes my code shorter
+} // makes my code shorter
 
 function createLine(x1, y1, x2, y2){
     return {x1: x1, y1: y1, x2: x2, y2: y2};
-}; // returns object with an x1, y1, x2, and y2
+} // returns object with an x1, y1, x2, and y2
 
 function distSq(x1, y1, x2, y2) {
     return sq(x2 - x1) + sq(y2 - y1);
-}; // a faster way to do circle-circle collisions
+} // a faster way to do circle-circle collisions
 
 function drawLine(line1){
     line(line1.x1, line1.y1, line1.x2, line1.y2);
-}; // mostly for debugging
+} // mostly for debugging
 
 function printLineStats(line){
     println("x1: " + line.x1);
     println("y1: " + line.y1);
     println("x2: " + line.x2);
     println("y2: " + line.y2);
-}; // this is solely for debugging
+} // this is solely for debugging
 
 function rotPoint(point, rect1, a){
 
@@ -84,7 +98,7 @@ function rotPoint(point, rect1, a){
         ny = (rect1.position.y + rect1.height/2) + sin(ang - rect1.rotation) * distToRect; 
     }
     return p(nx, ny);
-}; // rotates a point around the center of a rect
+} // rotates a point around the center of a rect
 
 function closestPointOnRect(rect, circ, rot) {
     if (rect.rotation === 0 || rot) {
@@ -99,14 +113,14 @@ function closestPointOnRect(rect, circ, rot) {
 
         return rotPoint(closestPointOnRect(rect, np, true), rect, 0);
     }  
-};
+}
 
 function rectCirc(rect, circ) {
     var point = closestPointOnRect(rect, circ, true);
     var nx = point.x;
     var ny = point.y;
     return distSq(nx, ny, circ.position.x, circ.position.y) < sq(circ.r);
-};
+}
 
 function findSign(n) {
     
@@ -115,7 +129,7 @@ function findSign(n) {
     }
 
     return abs(n)/n;
-}; // finds sign of n. returns -1, 1, or 0
+} // finds sign of n. returns -1, 1, or 0
 
 function lineToCirc(line, circ) {
     var distToCirc = dist(line.x1, line.y1, circ.position.x, circ.position.y);
@@ -128,7 +142,7 @@ function lineToCirc(line, circ) {
         return true;
     }
     return false;
-}; // sees if a line is colliding with a circle
+} // sees if a line is colliding with a circle
 
 function createRectSide(rect1, side, bulge) {
     var point1;
@@ -156,7 +170,7 @@ function createRectSide(rect1, side, bulge) {
     var p1 = rect1.rotation === 0 ? point1 : rotPoint(point1, rect1, 0);
     var p2 = rect1.rotation === 0 ? point2 : rotPoint(point2, rect1, 0);
     return createLine(p1.x, p1.y, p2.x, p2.y);
-}; // creates a line coresponding to the side of a rotated rectangle
+} // creates a line coresponding to the side of a rotated rectangle
 
 function rotColl(circ, rect1) {
     var point = {x: circ.position.x, y: circ.position.y};
@@ -164,11 +178,11 @@ function rotColl(circ, rect1) {
     np.r = circ.r;
     np.position = p(np.x, np.y);
     return rectCirc(rect1, np);
-}; // circ to rotated rectangle collision detection
+} // circ to rotated rectangle collision detection
 
 function lineAng(line) {
     return atan2(line.y2 - line.y1, line.x2 - line.x1);
-};} // some functions
+}//} some functions
 
 {
 var levels = [
@@ -176,67 +190,72 @@ var levels = [
     strt1: {x: 150, y: 500, origin: "left"},
     strt2: {x: 450, y: 500, origin: "right"},
     obstacles: [{x: 100, y: 300, width: 355, height: 20, type: "wall", rotation: radians(100), rectAlign: "center"}, {x: 200, y: 300, width: 355, height: 20, type: "wall", rotation: radians(80), rectAlign: "center"}, {x: 150, y: 130, width: 60, height: 20, type: "wall", rotation: radians(0), rectAlign: "center"}, {x: 400, y: 300, width: 355, height: 20, type: "wall", rotation: radians(100), rectAlign: "center"}, {x: 500, y: 300, width: 355, height: 20, type: "wall", rotation: radians(80), rectAlign: "center"}, {x: 450, y: 130, width: 60, height: 20, type: "wall", rotation: radians(0), rectAlign: "center"},],
-    holes: [{x: 150, y: 150}, {x: 450, y: 150}]
+    holes: [{x: 150, y: 150}, {x: 450, y: 150}],
+    par: 1,
 },{
     strt1: {x: 150, y: 500, origin: "left"},
     strt2: {x: 450, y: 100, origin: "right"},
-    obstacles: [{x: 50, y: 290, width: 246, height:20, type: "wall", }, {x: 400, y: 290, width: 199, height:20, type: "wall", }, {x: 450, y: 130, width: 60, height: 20, type: "wall", rotation: PI/4, rectAlign: "center"}, ],
-    holes: [{x: 150, y: 100}, {x: 450, y: 500}]
+    obstacles: [{x: 50, y: 290, width: 246, height:20, type: "wall", }, {x: 400, y: 290, width: 199, height:20, type: "wall", },],
+    holes: [{x: 150, y: 100}, {x: 450, y: 500}],
+    par: 3,
 },{
     strt1: {x: 150, y: 500, origin: "left"},
     strt2: {x: 450, y: 500, origin: "right"},
     obstacles: [{x: 1, y: 180, width: 240, height: 280, type: "hill", direc: new PVector(0.5, 0), }, {x: 359, y: 180, width: 240, height: 280, type: "hill", direc: new PVector(-0.5, 0), }, {x: 1, y: 100, width: 296, height:20, type: "wall", }, {x: 303, y: 100, width: 296, height:20, type: "wall", }],
-    holes: [{x: 150, y: 150}, {x: 450, y: 150}]
+    holes: [{x: 150, y: 150}, {x: 450, y: 150}],
+    par: 4,
 },{
     strt1: {x: 150, y: 500, origin: "left"},
     strt2: {x: 450, y: 200, origin: "right"},
-    obstacles: [{x: 1, y: 1, width: 99, height: 329, type: "water", }, {x: 200, y: 1, width: 96, height: 329, type: "water", }, {x: 1, y: 333, width: 99, height: 10, type: "wall", }, {x: 200, y: 333, width: 96, height: 10, type: "wall", }, {x: 304, y: 1, width: 395, height: 100, type: "water", }],
-    holes: [{x: 150, y: 100}, {x: 450, y: 400}]
+    obstacles: [{x: 1, y: 1, width: 99, height: 329, type: "water", }, {x: 200, y: 1, width: 96, height: 329, type: "water", }, {x: 1, y: 333, width: 99, height: 20, type: "wall", }, {x: 200, y: 333, width: 96, height: 20, type: "wall", }, {x: 304, y: 1, width: 395, height: 100, type: "water", }, {x: 140, y: 300, width: 40, height: 40, type: "hill", direc: new PVector(-0.2, 0)}, {x: 100, y: 280, width: 40, height: 40, type: "hill", direc: new PVector(0.1, 0)},{width: 100, height: 20, type: "move", shape: "rect", targets: [p(100, 50), p(100, 570)], speed: 1.5, }, {x: 0, y: 575, width: 300, height: 30, type: "water",}, {x: 470, y: 230, width: 400, height: 40, type: "hill", direc: new PVector(0.1, 0)}, {x: 480, y: 270, width: 80, height: 15, type: "wall"}, {x: 545, y: 271, width: 15, height: 300, type: "wall"}, {x: 560, y: 230, width: 40, height: 300, type: "hill", direc: new PVector(0, 0.2)}, ],
+    holes: [{x: 150, y: 100}, {x: 450, y: 400}],
+    par: 2,
 },{
     strt1: {x: 150, y: 500, origin: "left"},
     strt2: {x: 450, y: 500, origin: "right"},
     obstacles: [{x1: 200, y1: 350, x2: 400, y2: 350, strokeWeight: 50, type: "water", shape: "line"}, {x1: -100, y1: 250, x2: 150, y2: 250, strokeWeight: 50, type: "sand", shape: "line"}, {x1: 400, y1: -500, x2: 400, y2: 250, strokeWeight: 50, type: "water", shape: "line"}, {x1: 500, y1: 100, x2: 500, y2: 250, strokeWeight: 50, type: "water", shape: "line"}, {x: 195, y: 53, width: 80, height: 230, type: "hill", direc: new PVector(0, -0.5), }, {x: 1, y: 200, width: 190, height: 10, type: "wall", }, {x: 570, y: -10, width: 99, height: 100, type: "water", }],
-    holes: [{x: 150, y: 150}, {x: 550, y: 150}]
+    holes: [{x: 150, y: 150}, {x: 550, y: 150}],
+    par: 7,
 },{
     strt1: {x: 150, y: 500, origin: "left"},
     strt2: {x: 450, y: 500, origin: "right"},
     obstacles: [{x: 0, y: 150, r: 60, type: "wall", shape: "circ"}, {x: 600, y: 150, r: 60, type: "wall", shape: "circ"}, {x: 300, y: 150, r: 60, type: "wall", shape: "circ"}, {x: 150, y: 350, r: 60, type: "wall", shape: "circ"}, {x: 450, y: 350, r: 60, type: "wall", shape: "circ"}, {x1: -500, y1: 100, x2: 350, y2: 850, strokeWeight: 200, type: "water", shape: "line"}, {x1: 1100, y1: 100, x2: 250, y2: 850, strokeWeight: 200, type: "water", shape: "line"}],
-    holes: [{x: 150, y: 150}, {x: 450, y: 150}]
-},{
-    strt1: {x: 150, y: 400, origin: "left"},
-    strt2: {x: 450, y: 400, origin: "right"},
-    obstacles: [{x1: -100, y1: 400, x2: 350, y2: 850, strokeWeight: 200, type: "wall", shape: "line"}, {x1: 700, y1: 400, x2: 250, y2: 850, strokeWeight: 200, type: "wall", shape: "line"}, {x1: 100, y1: 400, x2: 350, y2: 250, strokeWeight: 20, type: "wall", shape: "line"}],
-    holes: [{x: 150, y: 100}, {x: 450, y: 100}]
-},{
-    strt1: {x: 150, y: 500, origin: "left"},
-    strt2: {x: 450, y: 200, origin: "right"},
-    obstacles: [{width: 60, height: 10, r: 50, type: "move", shape: "rect", targets: [p(80, 20), p(180, 70), p(180, 170), p(80, 170)], speed: 1, }],
-    holes: [{x: 150, y: 100}, {x: 450, y: 400}]
+    holes: [{x: 150, y: 150}, {x: 450, y: 150}],
+    par: 2,
 },{
     strt1: {x: 150, y: 500, origin: "left"},
     strt2: {x: 450, y: 500, origin: "right"},
-    obstacles: [{x: 200, y: 100, width: 50, height:50, type: "wall", }, {x: 200, y: 300, width: 10, height: 400, type: "wall", }],
-    holes: [{x: -285, y: 150}, {x: -450, y: 150}]
-}
+    obstacles: [   
+        {x1: 0, y1: 400, x2: 100, y2: 300, shape: "line", type: "wall", strokeWeight: 40,},
+        {x1: 300, y1: 400, x2: 200, y2: 300, shape: "line", type: "wall", strokeWeight: 40,},
+        {x1: 300, y1: 400, x2: 400, y2: 300, shape: "line", type: "wall", strokeWeight: 40,},
+        {x1: 600, y1: 400, x2: 500, y2: 300, shape: "line", type: "wall", strokeWeight: 40,},
+        {x1: 300, y1: 400, x2: 300, y2: 650, shape: "line", type: "sand", strokeWeight: 40,},
+        {r: 40, type: "move", shape: "circ", targets: [p(450, 290), p(350, 290),], speed: 1},
+        {r: 40, type: "move", shape: "circ", targets: [p(50, 290), p(150, 290),], speed: 1},
+    ],
+    holes: [{x: 150, y: 150}, {x: 450, y: 150}],
+    par: 3,
+},
 ]; /* contains the level data for all of the levels*/} // da leeveeels
 
-{
+//{
 function calcSlope(line) {
     return (line.y2 - line.y1) / (line.x2 - line.x1);
-}; // returns the slope of a line
+} // returns the slope of a line
 
 function calcIntercept(line, slope) {
     var x = line.x1;
     var y = line.y1;
     return y - slope * x;
-}; // returns intercept (b in mx + b = y)
+} // returns intercept (b in mx + b = y)
 
 function isPointOnLine(line, point) {
     if(point.x >= min(line.x1, line.x2) && point.x <= max(line.x1, line.x2) && point.y >= min(line.y1, line.y2) && point.y <= max(line.y1, line.y2)){
         return true;
     }
     return false;
-}; // finds if a point is on a line
+} // finds if a point is on a line
 
 function prepLine(line) {
     if(line.x1 === line.x2){
@@ -244,7 +263,7 @@ function prepLine(line) {
     }
     var m = calcSlope(line);
     return {m: m, b: calcIntercept(line, m), x1: line.x1,  y1: line.y1,  x2: line.x2,  y2: line.y2};
-}; // takes a line object and injects slope, intercept, and a vertical-ness boolean
+} // takes a line object and injects slope, intercept, and a vertical-ness boolean
 
 function findIntersection(line1, line2) {
     line1 = prepLine(line1);
@@ -268,9 +287,9 @@ function findIntersection(line1, line2) {
     var y = line1.m * x + line1.b;
     return {x: x, y: y, inter: isPointOnLine(line1, {x: x, y: y}, line1.m) && isPointOnLine(line2, {x: x, y: y}, line2.m)};
   }
-}; /* finds the intersection point of two lines, assuming the lines go infinitely in both directions */ } // line intersection shtuff
+}//finds the intersection point of two lines, assuming the lines go infinitely in both directions} // line intersection shtuff
 
-{
+//{
 var Particle = function(position, type) {
     this.acceleration = new PVector(0, 0);
     this.position = position.get();
@@ -386,9 +405,9 @@ ParticleSystems.prototype.run = function() {
     }
 };
 
-var gameParticles = new ParticleSystems();} // particles =P
+var gameParticles = new ParticleSystems();//} particles =P
 
-{
+//{
 function Obstacle(config) {
 
     this.shape = config.shape === undefined ? "rect" : config.shape;
@@ -447,21 +466,19 @@ function Obstacle(config) {
         this.color2 = color(181, 159, 79);
         break;
     case "move":
-        this.color1 = color(150);
-        this.color2 = color(100);
+        this.color1 = color(230, 192, 41);
+        this.color2 = color(153, 130, 55);
         break;
     }
-};
+}
 
 Obstacle.prototype.draw = function(col, offSet) {
     var pos;
     if (this.shape === "rect" || this.shape === "circ") {
         pos = this.position.get();
     }
-    if (col === undefined) {
-        switch(this.type){
-        case "wall":
-            fill(230, 192, 41);
+    function wall () {
+        fill(230, 192, 41);
             stroke(153, 130, 55);
             strokeWeight(obstacleStrokeWeight);
             if(showHitBoxes) {
@@ -486,6 +503,11 @@ Obstacle.prototype.draw = function(col, offSet) {
                 strokeWeight(this.strokeWeight - obstacleStrokeWeight*2);
                 drawLine(this);
             }
+    }
+    if (col === undefined) {
+        switch(this.type){
+        case "wall":
+            wall();
             break;
         case "hill":
                        
@@ -516,14 +538,7 @@ Obstacle.prototype.draw = function(col, offSet) {
             }
             break;
         case "move":
-            fill(150);
-            stroke(100);
-            strokeWeight(obstacleStrokeWeight);
-            if (this.shape === "rect") {
-                rect(pos.x + obstacleStrokeWeight/2, pos.y + obstacleStrokeWeight/2, this.width - obstacleStrokeWeight, this.height - obstacleStrokeWeight, 4);
-            } else if (this.shape === "circ") {
-                ellipse(pos.x, pos.y, this.r * 2 - obstacleStrokeWeight, this.r * 2 - obstacleStrokeWeight);
-            }
+            wall();
             break;
         case "water":
             fill(70, 70, 255);
@@ -627,7 +642,6 @@ var ObstacleSystem = function(){
     this.obstacles = [];
 };
 
-
 ObstacleSystem.prototype.run = function() {
     for (var i in this.obstacles){
         this.obstacles[i].update();
@@ -638,7 +652,7 @@ ObstacleSystem.prototype.run = function() {
     }
 };
 
-var obstacles = new ObstacleSystem(); /* obstacles in the current level */} // obstacles
+var obstacles = new ObstacleSystem(); // obstacles in the current level } // obstacles
 
 {
 var GolfBall = function(config){
@@ -847,7 +861,7 @@ GolfBall.prototype.findCollSide = function(sides, movementLine) {
     }
 
     return {ind: smallestDistInd, pos: smallestDistPos};
-}
+};
 
 GolfBall.prototype.noRotRectBounce = function(o) {
 
@@ -1067,6 +1081,60 @@ BallSystem.prototype.launch = function(){ // launch the balls
 var golfBalls = new BallSystem(); /* balls in the current level*/} // the golf balls
 
 {
+
+var Button = function(config){
+    this.x = config.x;
+    this.y = config.y;
+    this.width = config.width;
+    this.height = config.height;
+    this.text = config.text;
+    this.color = config.color;
+    this.stroke = config.stroke;
+    this.textColor = config.textColor;
+    this.textSize = config.textSize;
+    this.onClick = config.onClick;
+    this.scene = config.scene;
+    this.textYOffset = config.textYOffset || this.textSize/2;
+    this.delay = 10;
+};
+
+Button.prototype.update = function () {
+    if (scene === this.scene) {
+        this.delay --;
+    } else {
+        this.delay = 10;
+    }
+};
+
+Button.prototype.draw = function(){
+    pushMatrix();
+    translate(this.x + this.width/2, this.y + this.height/2);
+    if (this.mouseOver()){
+        scale(1.1);
+    }
+    fill(this.color);
+    stroke(this.stroke);
+    strokeWeight(3);
+    rect(-this.width/2, -this.height/2, this.width, this.height, 4);
+    fill(this.textColor);
+    textFont(ARIAL_BLACK);
+    textSize(this.textSize);
+    text(this.text, 0, this.textYOffset );
+    popMatrix();
+    
+};
+
+Button.prototype.mouseOver = function(){
+    return mouseX > this.x && mouseY > this.y && mouseX < this.x + this.width && mouseY < this.y + this.height;
+};
+
+Button.prototype.HMC = function(){
+    if(this.mouseOver() && scene === this.scene && this.delay < 1){
+        this.onClick(); 
+    }
+};} // button object
+
+{
 var fillLevel =  function(){ // takes the info from the level array, and then puts it into the global variables for the current level
     
     // clear the arrays
@@ -1119,6 +1187,7 @@ var fillLevel =  function(){ // takes the info from the level array, and then pu
             shape: curObs.shape,
             r: curObs.r,
             rotation: curObs.rotation,
+
         }));
     }
 
@@ -1126,14 +1195,233 @@ var fillLevel =  function(){ // takes the info from the level array, and then pu
     numHoles = 0; // the number of holes made
     
     strokes = 0; // the number of strokes taken
-};
 
-fillLevel();
-} // set up the level
+    par = levels[levelInd].par; // the par
+};} // set up the level
 
-{
+var btn1 = new Button({
+    x: 200, 
+    y: 250,
+    width: 200, 
+    height: 70,
+    text: "play", 
+    color: color(230, 192, 41), 
+    textColor: color(153, 130, 55, 200),
+    stroke: color(153, 130, 55), 
+    textSize: 60, 
+    scene: "home", 
+    textYOffset: 15, 
+    onClick: function () {
+        scene = "play";  
+        if (levelInd >= levels.length) {
+            scene = "win";
+        } else {
+            levelInd = levelsPlayed; fillLevel();
+        }
+    },
+});
+var btn2 = new Button({
+    x: 200, 
+    y: 250, 
+    width: 200, 
+    height: 70,
+    text: "next", 
+    color: color(230, 192, 41), 
+    textColor: color(153, 130, 55, 200),
+    stroke: color(153, 130, 55), 
+    textSize: 60, 
+    scene: "transition", 
+    textYOffset: 15, 
+    onClick: function () {
+        if (levelInd === levels.length - 1) {
+            scene = "win"; 
+            return;
+        } else{
+            levelInd++; 
+            scene = "play";
+            fillLevel(); 
+            transImg = null;
+        }
+    },
+});
+var btn3 = new Button({
+    x: 200, 
+    y: 350, 
+    width: 200, 
+    height: 70,
+    text: "home", 
+    color: color(230, 192, 41), 
+    textColor: color(153, 130, 55, 200),
+    stroke: color(153, 130, 55), 
+    textSize: 60, 
+    scene: "transition", 
+    textYOffset: 15, 
+    onClick: function () {
+        scene = "home"; 
+        levelInd++; 
+        transImg = null;
+    },
+});
+var btn4 = new Button({
+    x: 200, 
+    y: 350, 
+    width: 200, 
+    height: 70,
+    text: "levels", 
+    color: color(230, 192, 41), 
+    textColor: color(153, 130, 55, 200),
+    stroke: color(153, 130, 55), 
+    textSize: 60, 
+    scene: "home", 
+    textYOffset: 19, 
+    onClick: function () {
+        scene = "levelSelect";
+    },
+});
+var btn5 = new Button({
+    x: 200, 
+    y: 250, 
+    width: 200, 
+    height: 70,
+    text: "home", 
+    color: color(230, 192, 41), 
+    textColor: color(153, 130, 55, 200),
+    stroke: color(153, 130, 55), 
+    textSize: 60, 
+    scene: "win", 
+    textYOffset: 15, 
+    onClick: function () {
+        scene = "home"; 
+        levelInd++; 
+        transImg = null;
+    },
+});
+var btn6 = new Button({
+    x: 200,
+    y: 350, 
+    width: 200, 
+    height: 70,
+    text: "levels", 
+    color: color(230, 192, 41), 
+    textColor: color(153, 130, 55, 200),
+    stroke: color(153, 130, 55), 
+    textSize: 60, 
+    scene: "win", 
+    textYOffset: 19, onClick: function () {
+        scene = "levelSelect";
+    },
+});
+var btn7 = new Button({
+    x: 200, 
+    y: 500, 
+    width: 200, 
+    height: 70,
+    text: "home", 
+    color: color(230, 192, 41), 
+    textColor: color(153, 130, 55, 200),
+    stroke: color(153, 130, 55), 
+    textSize: 60, 
+    scene: "levelSelect", 
+    textYOffset: 19, onClick: function () {
+        scene = "home";
+    },
+});
+var btn8 = new Button({
+    x: 200, 
+    y: 450, 
+    width: 200, 
+    height: 70,
+    text: "how", 
+    color: color(230, 192, 41), 
+    textColor: color(153, 130, 55, 200),
+    stroke: color(153, 130, 55), 
+    textSize: 60, 
+    scene: "home", 
+    textYOffset: 19, 
+    onClick: function () {
+        scene = "how";
+    },
+});
+var btn9 = new Button({
+    x: 200, 
+    y: 500, 
+    width: 200, 
+    height: 70,
+    text: "home",
+    color: color(230, 192, 41), 
+    textColor: color(153, 130, 55, 200),
+    stroke: color(153, 130, 55), 
+    textSize: 60, 
+    scene: "how", 
+    textYOffset: 19,
+    onClick: function () {
+        scene = "home";
+    },
+});
+var btn10 = new Button({
+    x: 460, 
+    y: 450, 
+    width: 120, 
+    height: 50,
+    text: "→", 
+    color: color(230, 192, 41), 
+    textColor: color(153, 130, 55, 200),
+    stroke: color(153, 130, 55), 
+    textSize: 60, 
+    scene: "levelSelect", 
+    textYOffset: 15, 
+    onClick: function () {
+        if ((levelSelectVars.target/600 + 1) * 10 < levels.length) {
+            levelSelectVars.target += 600;
+        }
+        
+    },
+});
+var btn11 = new Button({
+    x: 20, 
+    y: 450, 
+    width: 120, 
+    height: 50,
+    text: "←", 
+    color: color(230, 192, 41), 
+    textColor: color(153, 130, 55, 200),
+    stroke: color(153, 130, 55), 
+    textSize: 60, 
+    scene: "levelSelect", 
+    textYOffset: 15, 
+    onClick: function () {
+        if (levelSelectVars.target >= 600) {
+            levelSelectVars.target -= 600;
+        }
+    },
+});
+var btn12 = new Button({
+    x: 5, 
+    y: 2, 
+    width: 70, 
+    height: 25,
+    text: "home", 
+    color: color(230, 192, 41), 
+    textColor: color(153, 130, 55, 200),
+    stroke: color(153, 130, 55), 
+    textSize: 20, 
+    scene: "play", 
+    textYOffset: 6, 
+    onClick: function () {
+        scene = "home";
+    },
+});
+
+var buttons = [btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10, btn11, btn12];
+
+
+
+//{
 var play = function(){
-
+    if (levelsPlayed < levelInd) {
+        levelsPlayed = levelInd;
+    }
+    textFont(ARIAL);
     background(92, 204, 12);
 
     // the holes
@@ -1151,8 +1439,6 @@ var play = function(){
     strokeWeight(5);
     line(width/2, -10, width/2, height + 10);
 
-    
-
     // the top bar
     noStroke();
     fill(0, 135, 0);
@@ -1160,12 +1446,7 @@ var play = function(){
     fill(255);
     textSize(20);
     textAlign(RIGHT, TOP);
-    if (strokes === 1) {
-        text(strokes + " stroke" , width - 5, 3);
-    } else {
-        text(strokes + " strokes" , width - 5, 3);
-    }
-
+    text("par: " + par + "    strokes: " + strokes, width - 5, 3);
     textAlign(CENTER);
     
     // run everything else  
@@ -1174,23 +1455,206 @@ var play = function(){
 
     // go to the next level if necessary
     if(numHoles >= 2){
-        levelInd ++;
-        fillLevel();
+        if (levelsPlayed < levelInd + 1) {
+            levelsPlayed = levelInd + 1;
+        }
+        scene = "transition";
     }
+    btn12.draw();
 };
-} // scenes. actuallllly, its scene. whelp
+function home () {
+    textFont(ARIAL_BLACK);
+    background(92, 204, 12);
+    fill(0, 100);
+    textSize(98);
+    text("Twini Putt", 305, 135);
+    fill(255);
+    text("Twini Putt", 300, 130);
+    textFont(ARIAL);
+    textSize(30);
+    text("Score: " + totalScore, 300, 200);
+    btn1.draw();
+    btn4.draw();
+    btn8.draw();
+}
+function how () {
+    textFont(ARIAL_BLACK);
+    background(92, 204, 12);
+    fill(0, 100);
+    textSize(98);
+    text("How", 305, 135);
+    fill(255);
+    text("How", 300, 130);
+    textFont(ARIAL);
+    textSize(30);
+    text("Basically mini-putt, but with a twist...\nThere are two balls!\nonce you get both balls in a hole\n you can advance to the next level.\nWhen you hit one ball,\n the other goes in the same direction.\n Try to get the lowest score you can.\nPress \"R\" to restart the level", 300, 200);
+    btn9.draw();
+}
+function transition () {
+    if (!transImg) {
+        transImg = get();
+        totalScore += (strokes - par);
+    }
+    image(transImg, 0, 0);
+    stroke(92, 204, 12);
+    strokeWeight(7);
+    line(300, 103, 300, 497);
+    fill(100, 100);
+    stroke(0);
+    strokeWeight(3);
+    rect(100, 100, 400, 400, 20);
+    fill(255);
+    
+    textFont(ARIAL);
+    textSize(30);
+    
+    text("score: " + (strokes - par), 300, 180);
+    text("total score: " + totalScore, 300, 220);
+    btn2.draw();
+    btn3.draw();
+}
+function win () {
+    textFont(ARIAL_BLACK);
+    background(92, 204, 12);
+    fill(0, 100);
+    textSize(98);
+    text("You won!", 305, 135);
+    fill(255);
+    text("You won!", 300, 130);
+    textFont(ARIAL);
+    textSize(30);
+    text("your score is: " + totalScore, 300, 200);
+    btn5.draw();
+    btn6.draw();
+}
+function levelSelect () {
+    textFont(ARIAL_BLACK);
+    background(92, 204, 12);
+    fill(0, 100);
+    textSize(68);
+    text("Level Select", 305, 125);
+    fill(255);
+    text("Level Select", 300, 120);
+    var v = levelSelectVars;
+    v.timeIn ++;
+    var start = v.offSet;
+    v.offSet = lerp(v.offSet, v.target + (findSign(v.target - v.offSet)*5), 0.2);
+    v.offSet = constrain(v.offSet, Math.min(start, v.target), Math.max(start, v.target));
+    
+    var w = 85;
+    var h = 110;
+
+    var j = 0;
+    for (var k = 1; k <= levels.length; k++) {
+        for(var i = 1; i <= levels.length; i++) {
+            for (j = 1; j <= levels.length; j++) {
+                
+                var x = (j*100 - 40) + (k-1) * 600 - levelSelectVars.offSet;
+                var y = 60 + i*125;
+                var num = (j + (i - 1)* 5 - 1) + (k - 1) * 10 + 1;
+                pushMatrix();
+                translate(x + w/2, y + h/2);
+                if (mouseX > x && mouseX < x + w && mouseY > y && mouseY < y + h) {
+                    scale(1.1);
+                    if (mouseDown && levelSelectVars.timeIn > 10 && j + (i - 1)* 5 <= levelsPlayed + 1) {
+                        scene = "play";
+                        levelInd = num - 1;
+                        fillLevel();
+                        canLaunch = false;
+                    }
+                }
+                fill(230, 192, 41);
+                stroke(153, 130, 55);
+                strokeWeight(3);
+                rect(-w/2, -h/2, w, h, 2);
+                fill(153, 130, 55, 200);
+                textFont(ARIAL_BLACK);
+                textSize(50);
+                if (num <= levelsPlayed + 1) {
+                    text(num, 0, 0);
+                }else {
+                    text("?", 0, 0);
+                }
+                
+                popMatrix();
+                if (j + (i - 1) * 5 + (k - 1) * 10 > levels.length - 1) {
+                    break;
+                }
+                if (j > 4) {
+                    break;
+                }
+            }
+        if (j + (i - 1) * 5 + (k - 1) * 10 > levels.length - 1) {
+            break;
+        }
+        if (i > 1) {
+            break;
+        }
+        }
+        if (j + (i - 1) * 5 + (k - 1) * 10 > levels.length - 1) {
+            break;
+        }
+    }
+    
+    btn7.draw();
+    btn10.draw();
+    btn11.draw();
+}
+//} // scenes
 
 {
 var draw = function() {
-    play();
-};
-} // draw shumpkin
+    for(var i in buttons) {
+        buttons[i].update();
+    }
+    if (scene !== "levelSelect") {
+        levelSelectVars.timeIn = 0;
+    }
+    switch (scene) {
+    case "home":
+        home();
+        break;
+    case "how":
+        how();
+        break;
+    case "play":
+        play();
+        break;
+    case "transition":
+        transition();
+        break;
+    case "win":
+        win();
+        break;
+    case "levelSelect":
+        levelSelect();
+        break;
+    }
+};} // draw shumpkin
 
 {
 mouseReleased = function(){
-    golfBalls.launch();
+    if (scene === "play" && canLaunch){
+        golfBalls.launch();
+    }
+    if (!canLaunch) {
+        canLaunch = !canLaunch;
+    }
+    for(var i in buttons) {
+        buttons[i].HMC();
+    }
+    mouseDown = false;
 };
-} // you've got tuh listen to the mouse
+mousePressed = function () {
+    mouseDown = true;
+};
+
+keyPressed = function () {
+    if (key.toString().toLowerCase() === "r") {
+        fillLevel();
+    }
+};} // you've got tuh listen to the mouse
+
 
 
 
